@@ -1,0 +1,8 @@
+./App images/Tailoring Made Easy Onboarding 1.png: 1024x1536, channels: 4, format: png
+./App images/All with Your Phone.png: 1024x1536, channels: 4, format: png
+./App images/App onboarding 1.png: 168x358, channels: 3, format: png
+./App images/App onboarding 2.png: 168x358, channels: 3, format: png
+./App images/App onboarding 3.png: 168x358, channels: 3, format: png
+./App images/App onboarding 4.png: 168x358, channels: 3, format: png
+./App images/App illustrations reference.png: 612x408, channels: 4, format: png
+./App images/App illustration without background.png: 612x408, channels: 4, format: png
