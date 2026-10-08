@@ -29,22 +29,25 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full min-h-screen bg-[#0A0A0E] text-white flex flex-col justify-between px-6 py-5 overflow-y-auto max-w-lg mx-auto">
+    <div className="relative w-full h-full min-h-screen bg-white text-neutral-900 flex flex-col justify-between px-6 py-5 overflow-y-auto max-w-lg mx-auto">
+      {/* Subtle atmospheric glow matching Onboarding */}
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-80 h-80 bg-[#6C47FF]/10 rounded-full blur-3xl pointer-events-none" />
+
       {/* Top Header */}
-      <div>
+      <div className="relative z-10">
         <div className="flex items-center justify-between mb-8">
           <button 
             onClick={onBack}
-            className="w-10 h-10 rounded-full bg-[#161622] border border-white/5 flex items-center justify-center text-white/80 hover:text-white hover:bg-[#1E1E2E] transition-all cursor-pointer"
+            className="w-10 h-10 rounded-full bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 flex items-center justify-center text-neutral-700 hover:text-neutral-950 transition-all cursor-pointer active:scale-95"
             aria-label="Back"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-2">
-            <Mascot size={22} color="green" />
-            <span className="font-display font-bold text-base tracking-tight text-white">
-              Measure <span className="text-[#27D07F]">Me</span>
+            <Mascot size={22} color="#6C47FF" />
+            <span className="font-display font-bold text-base tracking-tight text-neutral-950">
+              Measure <span className="text-[#6C47FF]">Me</span>
             </span>
           </div>
 
@@ -53,10 +56,10 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
         {/* Title & Subtitle */}
         <div className="mb-8">
-          <h1 className="text-3xl font-extrabold tracking-tight text-white font-display">
+          <h1 className="text-3xl font-black tracking-tight text-neutral-950 font-display">
             Create your account
           </h1>
-          <p className="text-sm text-[#8E8CA3] mt-2">
+          <p className="text-sm text-neutral-500 mt-2 font-medium leading-relaxed">
             Sign up now to start your bespoke digital fitting profile.
           </p>
         </div>
@@ -65,7 +68,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* Full Name */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#B4B1C9]">Full name</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-neutral-600">Full name</label>
             <div className="relative flex items-center">
               <input 
                 type="text"
@@ -73,15 +76,15 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="e.g. Ada Lovelace"
-                className="w-full h-12 bg-[#14141E] border border-white/10 rounded-xl px-4 text-sm text-white placeholder-[#5A586D] focus:outline-hidden focus:border-[#27D07F] focus:ring-1 focus:ring-[#27D07F] transition-all"
+                className="w-full h-13 bg-neutral-50 hover:bg-neutral-100/70 focus:bg-white border border-neutral-200 focus:border-[#6C47FF] focus:ring-2 focus:ring-[#6C47FF]/20 rounded-2xl px-4 text-sm text-neutral-900 placeholder-neutral-400 transition-all focus:outline-hidden"
               />
-              <User className="absolute right-3.5 w-4 h-4 text-[#5A586D]" />
+              <User className="absolute right-4 w-4 h-4 text-neutral-400" />
             </div>
           </div>
 
           {/* Email Address */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#B4B1C9]">Email address</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-neutral-600">Email address</label>
             <div className="relative flex items-center">
               <input 
                 type="email"
@@ -89,15 +92,15 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ada@example.com"
-                className="w-full h-12 bg-[#14141E] border border-white/10 rounded-xl px-4 text-sm text-white placeholder-[#5A586D] focus:outline-hidden focus:border-[#27D07F] focus:ring-1 focus:ring-[#27D07F] transition-all"
+                className="w-full h-13 bg-neutral-50 hover:bg-neutral-100/70 focus:bg-white border border-neutral-200 focus:border-[#6C47FF] focus:ring-2 focus:ring-[#6C47FF]/20 rounded-2xl px-4 text-sm text-neutral-900 placeholder-neutral-400 transition-all focus:outline-hidden"
               />
-              <Mail className="absolute right-3.5 w-4 h-4 text-[#5A586D]" />
+              <Mail className="absolute right-4 w-4 h-4 text-neutral-400" />
             </div>
           </div>
 
           {/* Password */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#B4B1C9]">Password</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-neutral-600">Password</label>
             <div className="relative flex items-center">
               <input 
                 type={showPassword ? 'text' : 'password'}
@@ -105,12 +108,12 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter a secure password"
-                className="w-full h-12 bg-[#14141E] border border-white/10 rounded-xl px-4 pr-11 text-sm text-white placeholder-[#5A586D] focus:outline-hidden focus:border-[#27D07F] focus:ring-1 focus:ring-[#27D07F] transition-all"
+                className="w-full h-13 bg-neutral-50 hover:bg-neutral-100/70 focus:bg-white border border-neutral-200 focus:border-[#6C47FF] focus:ring-2 focus:ring-[#6C47FF]/20 rounded-2xl px-4 pr-11 text-sm text-neutral-900 placeholder-neutral-400 transition-all focus:outline-hidden"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 text-[#5A586D] hover:text-white transition-colors cursor-pointer"
+                className="absolute right-4 text-neutral-400 hover:text-neutral-700 transition-colors cursor-pointer"
                 aria-label="Toggle password visibility"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -120,8 +123,8 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
           {/* Success Banner if submitted */}
           {submitted && (
-            <div className="p-3 bg-[#27D07F]/10 border border-[#27D07F]/30 rounded-xl flex items-center gap-2 text-xs text-[#27D07F] mt-2 animate-fade-in">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <div className="p-3 bg-[#6C47FF]/10 border border-[#6C47FF]/25 rounded-2xl flex items-center gap-2 text-xs text-[#6C47FF] mt-2 animate-fade-in font-medium">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-[#6C47FF]" />
               <span>Creating your profile and preparing dashboard...</span>
             </div>
           )}
@@ -130,8 +133,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
           <Button
             type="submit"
             disabled={submitted}
-            variant="default"
-            className="w-full h-13 mt-4 rounded-2xl bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
+            className="w-full h-13 mt-4 rounded-full bg-[#6C47FF] hover:bg-[#5C37EF] text-white font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#6C47FF]/25 active:scale-[0.98] transition-all"
           >
             {submitted ? 'Setting up...' : 'Create account'}
           </Button>
@@ -139,12 +141,12 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
       </div>
 
       {/* Bottom Link */}
-      <div className="pt-8 pb-4 text-center">
+      <div className="relative z-10 pt-8 pb-4 text-center">
         <button 
           onClick={onLoginClick}
-          className="text-xs font-medium text-[#8E8CA3] hover:text-white transition-colors cursor-pointer"
+          className="text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
         >
-          Already have an account? <span className="text-[#27D07F] font-semibold">Log in</span>
+          Already have an account? <span className="text-[#6C47FF] font-bold">Log in</span>
         </button>
       </div>
     </div>

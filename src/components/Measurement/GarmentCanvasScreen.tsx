@@ -257,7 +257,7 @@ export const GarmentCanvasScreen: React.FC<GarmentCanvasScreenProps> = ({
         <Button
           onClick={onOpenComments}
           variant="outline"
-          className="w-full h-12 rounded-2xl border-white/10 hover:border-[#27D07F]/40 bg-[#14141E] text-white flex items-center justify-center gap-2 cursor-pointer text-sm"
+          className="w-full h-12 rounded-full border-white/10 hover:border-[#27D07F]/40 bg-[#14141E] text-white flex items-center justify-center gap-2 cursor-pointer text-sm"
         >
           <Plus className="w-4 h-4 text-[#27D07F]" />
           <span>Add Comment Pin</span>

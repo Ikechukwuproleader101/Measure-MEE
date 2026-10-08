@@ -110,7 +110,7 @@ export const MeasurementGuideScreen: React.FC<MeasurementGuideScreenProps> = ({
         <Button
           onClick={onStartCapture}
           variant="default"
-          className="w-full h-13 rounded-2xl bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
+          className="w-full h-13 rounded-full bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
         >
           <span>Start Camera Capture</span>
         </Button>

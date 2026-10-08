@@ -7,7 +7,7 @@ import {
 } from '../ui/carousel';
 import { Button } from '../ui/button';
 import { Mascot } from '../common/Mascot';
-import { ArrowRight, ArrowLeft, Sparkles, ShieldCheck, Users, Smartphone } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Sparkles, Users, Smartphone } from 'lucide-react';
 
 interface OnboardingCarouselProps {
   onComplete: () => void;
@@ -67,31 +67,31 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
     },
     {
       id: 3,
-      badge: "Triple-Signal Calibration",
-      badgeIcon: <ShieldCheck className="w-3.5 h-3.5 text-[#B69EFF]" />,
-      titlePrimary: "Tailored precision,",
-      titleAccent: "zero manual",
-      titleSecondary: "hassle.",
-      accentColor: "text-[#B69EFF]",
-      description: "Smart calibration and distance gating ensure tailor-grade accuracy without a tape measure.",
-      imageSrc: "/images/illustrations/man-lidar-scan.png",
-      imageAlt: "Triple-Signal LiDAR and Distance Calibration",
-      illustrationFallbackText: "LiDAR Distance Calibration",
-      theme: 'dark',
+      badge: "Manage Clients",
+      badgeIcon: <Users className="w-3.5 h-3.5 text-[#6C47FF]" />,
+      titlePrimary: "Manage Clients",
+      titleAccent: "Body measurements",
+      titleSecondary: "",
+      accentColor: "text-[#6C47FF]",
+      description: "You can manage clients body measurement in a well organised and structure.",
+      imageSrc: "/images/illustrations/onboarding-slide3-transparent.png",
+      imageAlt: "Manage Clients Body measurements - Tailoring Client Measurement Suite",
+      illustrationFallbackText: "Manage Clients Body Measurements Illustration",
+      theme: 'light',
     },
     {
       id: 4,
-      badge: "Real-time Tailor Sync",
-      badgeIcon: <Users className="w-3.5 h-3.5 text-[#27D07F]" />,
-      titlePrimary: "Connect directly",
-      titleAccent: "with your",
-      titleSecondary: "master tailor.",
-      accentColor: "text-[#27D07F]",
-      description: "Share projects, pin comments on croquis diagrams, and track your garment from cut to fit.",
-      imageSrc: "/images/illustrations/mascot-waving.png",
-      imageAlt: "Direct Real-time Tailor Collaboration",
-      illustrationFallbackText: "Bespoke Tailor Studio Sync",
-      theme: 'dark',
+      badge: "Gen-Z Tailoring",
+      badgeIcon: <Sparkles className="w-3.5 h-3.5 text-[#6C47FF]" />,
+      titlePrimary: "Become that",
+      titleAccent: "Genz tailor",
+      titleSecondary: "",
+      accentColor: "text-[#6C47FF]",
+      description: "Take away the hassle of booking physical appointments from you clients who just want to be dressed nice.",
+      imageSrc: "/images/illustrations/onboarding-slide4-transparent.png",
+      imageAlt: "Become that Genz tailor - Take away the hassle of booking physical appointments",
+      illustrationFallbackText: "Modern Gen-Z Tailor Illustration",
+      theme: 'light',
     }
   ];
 
@@ -211,7 +211,7 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
                       <div className="text-center pt-2 pb-4 px-2">
                         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-950 leading-tight font-display">
                           {slide.titlePrimary}{' '}
-                          <span className="text-[#6C47FF] block sm:inline">{slide.titleAccent}</span>
+                          <span className="text-[#6C47FF] block">{slide.titleAccent}</span>
                         </h1>
 
                         <p className="mt-3 text-xs sm:text-sm text-neutral-500 leading-relaxed max-w-xs sm:max-w-sm mx-auto font-normal">
@@ -273,40 +273,53 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
       <footer className="px-6 pb-8 pt-2 max-w-lg mx-auto w-full z-20 flex flex-col gap-3">
         {isLight ? (
           /* Light Footer matching the provided screens: [← Back]  [ • • • • ]  [Next →] */
-          <div className="flex items-center justify-between w-full pt-1">
-            <button
-              onClick={handlePrev}
-              disabled={currentIndex === 0}
-              className={`flex items-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer ${
-                currentIndex === 0 ? 'text-transparent pointer-events-none opacity-0' : 'text-neutral-600 hover:text-neutral-950'
-              }`}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
+          <div className="flex flex-col gap-2 w-full pt-1">
+            <div className="flex items-center justify-between w-full">
+              <button
+                onClick={handlePrev}
+                disabled={currentIndex === 0}
+                className={`flex items-center gap-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+                  currentIndex === 0 ? 'text-transparent pointer-events-none opacity-0' : 'text-neutral-700 hover:text-neutral-950'
+                }`}
+              >
+                <ArrowLeft className="w-4 h-4 stroke-[2]" />
+                <span>Back</span>
+              </button>
 
-            {/* Bottom 4 Dots matching exact mockup positioning */}
-            <div className="flex items-center gap-2">
-              {slides.map((_, idx) => (
-                <div
-                  key={idx}
-                  className={`rounded-full transition-all duration-300 ${
-                    idx === currentIndex
-                      ? 'w-2.5 h-2.5 bg-[#6C47FF]'
-                      : 'w-2 h-2 bg-neutral-300'
-                  }`}
-                />
-              ))}
+              {/* Bottom 4 Dots matching exact mockup positioning */}
+              <div className="flex items-center gap-2">
+                {slides.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => api?.scrollTo(idx)}
+                    aria-label={`Go to slide ${idx + 1}`}
+                    className={`rounded-full transition-all duration-300 cursor-pointer ${
+                      idx === currentIndex
+                        ? 'w-2.5 h-2.5 bg-[#6C47FF]'
+                        : 'w-2 h-2 bg-[#E5E0FF] hover:bg-[#D5CEFC]'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Purple Pill Button matching mockup */}
+              <Button
+                onClick={handleNext}
+                className="h-12 px-6 rounded-full bg-[#6C47FF] hover:bg-[#5C37EF] text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#6C47FF]/25 transition-all"
+              >
+                <span>Next</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              </Button>
             </div>
 
-            {/* Purple Pill Button matching mockup */}
-            <Button
-              onClick={handleNext}
-              className="h-12 px-6 rounded-2xl bg-[#6C47FF] hover:bg-[#5C37EF] text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#6C47FF]/25"
-            >
-              <span>Next</span>
-              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </Button>
+            {currentIndex === slides.length - 1 && (
+              <button 
+                onClick={onLoginClick || onComplete}
+                className="text-center text-xs font-medium text-neutral-500 hover:text-[#6C47FF] transition-colors pt-1 cursor-pointer"
+              >
+                Already have an account? <span className="underline decoration-neutral-300 text-[#6C47FF] font-semibold">Log in</span>
+              </button>
+            )}
           </div>
         ) : (
           /* Dark Footer for subsequent slides */
@@ -314,7 +327,7 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
             <Button
               onClick={handleNext}
               variant="default"
-              className="w-full h-13 rounded-2xl bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
+              className="w-full h-13 rounded-full bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
             >
               <span>{currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />

@@ -138,7 +138,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
         <Button
           onClick={onSaveToProject}
           variant="default"
-          className="w-full h-13 rounded-2xl bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
+          className="w-full h-13 rounded-full bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
         >
           <Check className="w-5 h-5 stroke-[2.5]" />
           <span>Save to Wedding Suit</span>
@@ -147,7 +147,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
         <Button
           onClick={onViewDetails}
           variant="secondary"
-          className="w-full h-12 rounded-2xl bg-[#14141E] hover:bg-[#1C1C2A] text-white border border-white/10 font-medium text-sm cursor-pointer"
+          className="w-full h-12 rounded-full bg-[#14141E] hover:bg-[#1C1C2A] text-white border border-white/10 font-medium text-sm cursor-pointer"
         >
           View Croquis Canvas & Comment Pins
         </Button>

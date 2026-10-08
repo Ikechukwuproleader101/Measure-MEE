@@ -146,7 +146,7 @@ export const CommentsScreen: React.FC<CommentsScreenProps> = ({ onBack }) => {
           <button
             type="submit"
             disabled={!newComment.trim()}
-            className="absolute right-2 w-8 h-8 rounded-xl bg-[#27D07F] hover:bg-[#22BD73] disabled:opacity-30 disabled:pointer-events-none text-neutral-950 flex items-center justify-center cursor-pointer transition-transform active:scale-90"
+            className="absolute right-2 w-8 h-8 rounded-full bg-[#27D07F] hover:bg-[#22BD73] disabled:opacity-30 disabled:pointer-events-none text-neutral-950 flex items-center justify-center cursor-pointer transition-transform active:scale-90"
             aria-label="Send"
           >
             <Send className="w-4 h-4 fill-neutral-950" />

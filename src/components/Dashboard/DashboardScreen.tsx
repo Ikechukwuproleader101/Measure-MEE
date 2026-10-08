@@ -100,7 +100,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               onClick={onStartMeasurement}
               variant="default"
               size="sm"
-              className="mt-4 bg-[#0A0A0E] hover:bg-neutral-900 text-white rounded-xl text-xs font-bold px-4 py-2 flex items-center gap-1.5 shadow-md cursor-pointer"
+              className="mt-4 bg-[#0A0A0E] hover:bg-neutral-900 text-white rounded-full text-xs font-bold px-4 py-2 flex items-center gap-1.5 shadow-md cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5 text-[#27D07F]" />
               <span>Launch Scan</span>

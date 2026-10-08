@@ -180,7 +180,7 @@ export const ProjectDetailsScreen: React.FC<ProjectDetailsScreenProps> = ({
         <Button
           onClick={onAddMeasurement}
           variant="default"
-          className="w-full h-13 rounded-2xl bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
+          className="w-full h-13 rounded-full bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
         >
           <Plus className="w-5 h-5 stroke-[2.5]" />
           <span>Add measurement</span>
