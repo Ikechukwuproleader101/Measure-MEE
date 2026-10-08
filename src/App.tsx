@@ -39,7 +39,7 @@ export function App() {
     { id: 'splash', label: '1. Splash Screen', num: '1' },
     { id: 'onboarding', label: '2. Onboarding Carousel', num: '2' },
     { id: 'create-account', label: '3. Sign Up / Create Account', num: '3' },
-    { id: 'login', label: '4. Login Screen', num: '4' },
+    { id: 'login', label: '4. Login / Onboarding Auth (Ref Mockup)', num: '4' },
     { id: 'dashboard', label: '5. Dashboard Home', num: '5' },
     { id: 'projects', label: '6. Projects List', num: '6' },
     { id: 'project-details', label: '7. Project Details', num: '7' },
@@ -117,7 +117,7 @@ export function App() {
 
           {currentScreen === 'onboarding' && (
             <OnboardingCarousel
-              onComplete={() => setCurrentScreen('create-account')}
+              onComplete={() => setCurrentScreen('login')}
               onLoginClick={() => setCurrentScreen('login')}
             />
           )}

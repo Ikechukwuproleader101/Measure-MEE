@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Mascot } from '../common/Mascot';
 import { Button } from '../ui/button';
 import { ArrowLeft, Eye, EyeOff, User, Mail, CheckCircle2 } from 'lucide-react';
 
@@ -45,9 +44,13 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
           </button>
 
           <div className="flex items-center gap-2">
-            <Mascot size={22} color="#6C47FF" />
-            <span className="font-display font-bold text-base tracking-tight text-neutral-950">
-              Measure <span className="text-[#6C47FF]">Me</span>
+            <img 
+              src="/images/measureme-logo-purple.png" 
+              alt="Measure Me Logo" 
+              className="w-6 h-auto object-contain"
+            />
+            <span className="font-display font-bold text-base tracking-tight text-[#161839]">
+              Measure <span className="text-[#6C3EE0]">me</span>
             </span>
           </div>
 
