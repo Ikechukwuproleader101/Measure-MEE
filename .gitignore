@@ -7,10 +7,24 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependencies and build outputs
+node_modules/
+dist/
+dist-ssr/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python cache and virtualenvs
+**/__pycache__/
+*.pyc
+.venv/
+
+# Scratch & test outputs
+test_*.txt
 
 # Editor directories and files
 .vscode/*
@@ -23,4 +37,3 @@ dist-ssr
 *.sln
 *.sw?
 desktop.ini
-
