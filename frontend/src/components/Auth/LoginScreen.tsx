@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Mail, ArrowLeft, Mic, Smile, X, Check } from 'lucide-react';
+import { Mail, ArrowLeft, Mic, Smile, X, Check, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../auth/useAuth';
+import { supabase } from '../../lib/supabaseClient';
 
 interface LoginScreenProps {
   onBack?: () => void;
@@ -12,20 +14,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onSuccess,
   onCreateAccountClick,
 }) => {
-  const [email, setEmail] = useState('ikechukwu@gmail.com');
-  const [isFocused, setIsFocused] = useState(true);
+  const { signIn, signInWithGoogle } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
-  const [showKeyboard, setShowKeyboard] = useState(true);
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const [isShiftActive, setIsShiftActive] = useState(false);
   const [isNumberPad, setIsNumberPad] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   // Trigger feedback toast
   const triggerToast = (msg: string) => {
     setShowToast(msg);
-    setTimeout(() => setShowToast(null), 3000);
+    setTimeout(() => setShowToast(null), 3500);
   };
 
   const handleClearEmail = (e: React.MouseEvent) => {
@@ -34,43 +41,78 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     inputRef.current?.focus();
   };
 
-  const handleContinue = (e?: React.FormEvent) => {
+  const handleContinue = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setErrorMsg(null);
+
     if (!email.trim() || !email.includes('@')) {
       triggerToast('Please enter a valid email address');
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    if (!password) {
+      triggerToast('Please enter your password');
+      setErrorMsg('Please enter your password.');
+      passwordRef.current?.focus();
       return;
     }
 
     setIsLoading(true);
-    triggerToast(`Welcome back, ${email.split('@')[0]}! Signing in...`);
-    
-    setTimeout(() => {
+
+    try {
+      const { session } = await signIn({
+        email: email.trim(),
+        password,
+      });
+
+      if (session) {
+        onSuccess();
+      }
+    } catch {
+      // Per brief: On failure, show a single generic message. Do not reveal whether email exists.
+      const genericError = 'Invalid email or password';
+      setErrorMsg(genericError);
+      triggerToast(genericError);
+    } finally {
       setIsLoading(false);
-      onSuccess();
-    }, 900);
+    }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    triggerToast('Connecting to Google...');
-    setTimeout(() => {
+    setErrorMsg(null);
+    try {
+      await signInWithGoogle();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Google sign-in failed';
+      triggerToast(message);
+      setErrorMsg(message);
       setIsLoading(false);
-      onSuccess();
-    }, 700);
+    }
   };
 
   const handleAppleSignIn = () => {
-    setIsLoading(true);
-    triggerToast('Authenticating with Apple ID...');
-    setTimeout(() => {
-      setIsLoading(false);
-      onSuccess();
-    }, 700);
+    triggerToast('Apple sign-in is coming soon. Please sign in with Email or Google.');
   };
 
-  const handleForgotPassword = (e: React.MouseEvent) => {
+  const handleForgotPassword = async (e: React.MouseEvent) => {
     e.preventDefault();
-    triggerToast(`Password reset link sent to ${email || 'your email'}`);
+    if (!email.trim() || !email.includes('@')) {
+      triggerToast('Enter your email above first to receive reset instructions');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      triggerToast(`Password reset link sent to ${email.trim()}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not send reset email';
+      triggerToast(message);
+    }
   };
 
   // Virtual keyboard interaction
@@ -173,7 +215,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         </div>
 
         {/* Input & Form Controls */}
-        <form onSubmit={handleContinue} className="flex flex-col gap-3.5 w-full">
+        <form onSubmit={handleContinue} className="flex flex-col gap-3 w-full">
           {/* Email Input Field */}
           <div 
             onClick={() => {
@@ -191,14 +233,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <Mail className="w-5 h-5 stroke-[2]" />
             </div>
 
-            {/* Real Editable Input with simulated blinking cursor */}
+            {/* Real Editable Input */}
             <div className="relative flex-1 flex items-center overflow-hidden">
               <input
                 ref={inputRef}
                 type="email"
+                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 placeholder="Enter your email"
                 autoComplete="email"
                 className="w-full bg-transparent text-[#161839] text-[15px] font-normal tracking-normal focus:outline-hidden placeholder-[#868CA8]/70"
@@ -218,11 +262,53 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             )}
           </div>
 
+          {/* Password Input Field */}
+          <div 
+            onClick={() => {
+              passwordRef.current?.focus();
+            }}
+            className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#EEEBF8] border border-[#E4E0F4] focus-within:bg-[#EAE7F6] focus-within:ring-2 focus-within:ring-[#6C3EE0]/30 focus-within:border-[#DCD7F0] transition-all duration-200 cursor-text"
+          >
+            <div className="shrink-0 text-[#6C3EE0]">
+              <Lock className="w-5 h-5 stroke-[2]" />
+            </div>
+
+            <div className="relative flex-1 flex items-center overflow-hidden">
+              <input
+                ref={passwordRef}
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                className="w-full bg-transparent text-[#161839] text-[15px] font-normal tracking-normal focus:outline-hidden placeholder-[#868CA8]/70 pr-2"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="text-[#868CA8] hover:text-[#161839] transition-colors cursor-pointer shrink-0"
+              aria-label="Toggle password visibility"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* Error Banner if error exists */}
+          {errorMsg && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2 text-xs text-red-600 animate-fade-in font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
           {/* Primary Continue Button */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-[52px] rounded-full bg-[#6C3EE0] hover:bg-[#5E32D0] active:bg-[#552ABE] text-white font-semibold text-[15px] tracking-tight flex items-center justify-center gap-1.5 shadow-md shadow-[#6C3EE0]/25 transition-all duration-150 cursor-pointer active:scale-[0.99]"
+            className="w-full h-[52px] rounded-full bg-[#6C3EE0] hover:bg-[#5E32D0] active:bg-[#552ABE] text-white font-semibold text-[15px] tracking-tight flex items-center justify-center gap-1.5 shadow-md shadow-[#6C3EE0]/25 transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
@@ -230,11 +316,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
-                <span>Continuing...</span>
+                <span>Signing in...</span>
               </span>
             ) : (
               <>
-                <span>Continue</span>
+                <span>Sign in</span>
                 <span className="text-base font-normal leading-none ml-0.5">→</span>
               </>
             )}
@@ -255,8 +341,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           {/* Continue with Google */}
           <button
             type="button"
+            disabled={isLoading}
             onClick={handleGoogleSignIn}
-            className="w-full h-[52px] rounded-full bg-white hover:bg-neutral-50/90 active:bg-neutral-100 border border-[#E5E3EE] text-[#121625] font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 cursor-pointer active:scale-[0.99]"
+            className="w-full h-[52px] rounded-full bg-white hover:bg-neutral-50/90 active:bg-neutral-100 border border-[#E5E3EE] text-[#121625] font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
           >
             {/* Google colored G icon */}
             <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
@@ -305,7 +392,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </button>
         </div>
 
-        {/* Optional Sign up link if user needs to create brand new account */}
+        {/* Sign up link */}
         {onCreateAccountClick && (
           <div className="text-center pb-2">
             <button
@@ -319,9 +406,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         )}
       </div>
 
-      {/* Realistic Simulated iOS Virtual Keyboard matching the reference mockup */}
+      {/* Simulated iOS Virtual Keyboard toggle */}
       <div className="w-full flex flex-col justify-end bg-[#E2E1EB] pt-1.5 pb-2 border-t border-[#D7D5E4] shadow-inner select-none transition-all">
-        {/* Keyboard Header bar with Dismiss/Toggle controls */}
         <div className="px-4 py-1 flex items-center justify-between text-[11px] text-[#73779C]">
           <span className="font-medium tracking-wide">English (US)</span>
           <button
@@ -335,7 +421,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         {showKeyboard && (
           <div className="w-full max-w-md mx-auto px-1 flex flex-col gap-2 pt-1">
-            {/* Keyboard Row 1: q w e r t y u i o p */}
             <div className="flex justify-center gap-1.5 px-0.5">
               {(isNumberPad ? row1Numbers : row1Letters).map((key) => (
                 <button
@@ -349,7 +434,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               ))}
             </div>
 
-            {/* Keyboard Row 2: a s d f g h j k l */}
             <div className="flex justify-center gap-1.5 px-3">
               {(isNumberPad ? row2Numbers : row2Letters).map((key) => (
                 <button
@@ -363,9 +447,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               ))}
             </div>
 
-            {/* Keyboard Row 3: Shift / Numbers, z x c v b n m, Backspace */}
             <div className="flex justify-between items-center gap-1.5 px-0.5">
-              {/* Shift Key */}
               <button
                 type="button"
                 onClick={() => setIsShiftActive(!isShiftActive)}
@@ -379,7 +461,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </svg>
               </button>
 
-              {/* Row 3 letters */}
               <div className="flex-1 flex justify-center gap-1.5">
                 {(isNumberPad ? row3Numbers : row3Letters).map((key) => (
                   <button
@@ -393,7 +474,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 ))}
               </div>
 
-              {/* Backspace Key */}
               <button
                 type="button"
                 onClick={handleVirtualBackspace}
@@ -406,9 +486,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </button>
             </div>
 
-            {/* Keyboard Row 4: 123, space, return */}
             <div className="flex justify-between items-center gap-1.5 px-0.5 mt-0.5">
-              {/* 123 toggle key */}
               <button
                 type="button"
                 onClick={() => setIsNumberPad(!isNumberPad)}
@@ -417,7 +495,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 {isNumberPad ? 'ABC' : '123'}
               </button>
 
-              {/* Space Bar */}
               <button
                 type="button"
                 onClick={handleVirtualSpace}
@@ -426,7 +503,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 space
               </button>
 
-              {/* Return Key */}
               <button
                 type="button"
                 onClick={() => handleContinue()}
@@ -436,9 +512,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </button>
             </div>
 
-            {/* Bottom Row: Emoji Smiley, Home indicator bar, Microphone */}
             <div className="flex items-center justify-between px-5 pt-3 pb-1 text-[#4A475A]">
-              {/* Emoji Icon */}
               <button
                 type="button"
                 onClick={() => triggerToast('Emoji keyboard')}
@@ -448,10 +522,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <Smile className="w-6 h-6 stroke-[1.6]" />
               </button>
 
-              {/* iOS Home Indicator Bar */}
               <div className="w-34 h-1 bg-[#1A1A1A] rounded-full mx-auto" />
 
-              {/* Microphone Icon */}
               <button
                 type="button"
                 onClick={() => triggerToast('Dictation activated')}

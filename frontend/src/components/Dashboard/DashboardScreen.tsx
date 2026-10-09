@@ -11,7 +11,8 @@ import {
   Share2, 
   Sparkles,
   ArrowRight,
-  Clock
+  Clock,
+  LogOut
 } from 'lucide-react';
 
 interface DashboardScreenProps {
@@ -19,6 +20,7 @@ interface DashboardScreenProps {
   onOpenProjects: () => void;
   onOpenProjectDetails: (projectId: string) => void;
   onShareLink: () => void;
+  onSignOut?: () => void;
   userName?: string;
 }
 
@@ -27,6 +29,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenProjects,
   onOpenProjectDetails,
   onShareLink,
+  onSignOut,
   userName = "Ada"
 }) => {
   return (
@@ -56,6 +59,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               {userName.slice(0, 2).toUpperCase()}
             </div>
           </div>
+
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="w-9 h-9 rounded-full bg-[#161624] border border-white/10 flex items-center justify-center text-white/60 hover:text-red-400 hover:border-red-500/40 transition-colors cursor-pointer ml-1"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </header>
 

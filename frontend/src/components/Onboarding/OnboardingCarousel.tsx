@@ -7,7 +7,8 @@ import {
 } from '../ui/carousel';
 import { Button } from '../ui/button';
 import { Mascot } from '../common/Mascot';
-import { ArrowRight, ArrowLeft, Sparkles, Users, Smartphone } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Sparkles, Users, Smartphone, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../auth/useAuth';
 
 interface OnboardingCarouselProps {
   onComplete: () => void;
@@ -33,8 +34,11 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
   onComplete,
   onLoginClick
 }) => {
+  const { completeOnboarding, session } = useAuth();
   const [api, setApi] = useState<CarouselApi>();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   const slides: SlideData[] = [
     {
@@ -109,22 +113,42 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
     };
   }, [api, onSelect]);
 
-  const handleNext = () => {
-    if (!api) return;
-    if (currentIndex < slides.length - 1) {
-      api.scrollNext();
+  const handleFinishOnboarding = async () => {
+    if (isCompleting) return;
+    setCompleteError(null);
+
+    if (session) {
+      setIsCompleting(true);
+      try {
+        await completeOnboarding();
+        onComplete();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Could not save onboarding progress. Please try again.';
+        setCompleteError(message);
+      } finally {
+        setIsCompleting(false);
+      }
     } else {
       onComplete();
     }
   };
 
-  const handlePrev = () => {
+  const handleNext = () => {
     if (!api) return;
+    if (currentIndex < slides.length - 1) {
+      api.scrollNext();
+    } else {
+      handleFinishOnboarding();
+    }
+  };
+
+  const handlePrev = () => {
+    if (!api || isCompleting) return;
     api.scrollPrev();
   };
 
   const handleSkip = () => {
-    onComplete();
+    handleFinishOnboarding();
   };
 
   const currentTheme = slides[currentIndex]?.theme || 'dark';
@@ -174,11 +198,12 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
         {/* Skip Action */}
         <button 
           onClick={handleSkip}
-          className={`text-xs font-semibold transition-colors px-2 py-1 cursor-pointer ${
+          disabled={isCompleting}
+          className={`text-xs font-semibold transition-colors px-2 py-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
             isLight ? 'text-neutral-500 hover:text-neutral-950' : 'text-[#8E8CA3] hover:text-white'
           }`}
         >
-          Skip
+          {isCompleting ? 'Saving...' : 'Skip'}
         </button>
       </header>
 
@@ -271,13 +296,29 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
 
       {/* Bottom Sticky Action Area */}
       <footer className="px-6 pb-8 pt-2 max-w-lg mx-auto w-full z-20 flex flex-col gap-3">
+        {completeError && (
+          <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-2xl flex items-center justify-between text-xs text-red-400 font-medium animate-fade-in">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+              <span>{completeError}</span>
+            </div>
+            <button 
+              type="button"
+              onClick={handleFinishOnboarding}
+              className="text-[#27D07F] hover:underline font-semibold cursor-pointer shrink-0 ml-2"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {isLight ? (
           /* Light Footer matching the provided screens: [← Back]  [ • • • • ]  [Next →] */
           <div className="flex flex-col gap-2 w-full pt-1">
             <div className="flex items-center justify-between w-full">
               <button
                 onClick={handlePrev}
-                disabled={currentIndex === 0}
+                disabled={currentIndex === 0 || isCompleting}
                 className={`flex items-center gap-1.5 text-sm font-semibold transition-colors cursor-pointer ${
                   currentIndex === 0 ? 'text-transparent pointer-events-none opacity-0' : 'text-neutral-700 hover:text-neutral-950'
                 }`}
@@ -291,7 +332,7 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
                 {slides.map((_, idx) => (
                   <button
                     key={idx}
-                    onClick={() => api?.scrollTo(idx)}
+                    onClick={() => !isCompleting && api?.scrollTo(idx)}
                     aria-label={`Go to slide ${idx + 1}`}
                     className={`rounded-full transition-all duration-300 cursor-pointer ${
                       idx === currentIndex
@@ -305,10 +346,23 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
               {/* Purple Pill Button matching mockup */}
               <Button
                 onClick={handleNext}
-                className="h-12 px-6 rounded-full bg-[#6C47FF] hover:bg-[#5C37EF] text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#6C47FF]/25 transition-all"
+                disabled={isCompleting}
+                className="h-12 px-6 rounded-full bg-[#6C47FF] hover:bg-[#5C37EF] text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#6C47FF]/25 transition-all disabled:opacity-60"
               >
-                <span>Next</span>
-                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                {isCompleting ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span>Saving...</span>
+                  </span>
+                ) : (
+                  <>
+                    <span>Next</span>
+                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                  </>
+                )}
               </Button>
             </div>
 
@@ -326,11 +380,24 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
           <>
             <Button
               onClick={handleNext}
+              disabled={isCompleting}
               variant="default"
-              className="w-full h-13 rounded-full bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15"
+              className="w-full h-13 rounded-full bg-[#27D07F] hover:bg-[#22BD73] text-neutral-950 font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#27D07F]/15 disabled:opacity-60"
             >
-              <span>{currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}</span>
-              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              {isCompleting ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4 text-neutral-950" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  <span>Saving...</span>
+                </span>
+              ) : (
+                <>
+                  <span>{currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}</span>
+                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                </>
+              )}
             </Button>
 
             <button 
