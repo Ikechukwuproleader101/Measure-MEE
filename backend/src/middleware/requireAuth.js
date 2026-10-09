@@ -25,7 +25,8 @@ export const requireAuth = async (req, _res, next) => {
 
   try {
     // Verify token directly with Supabase Auth
-    const { data: { user } = {}, error } = await supabaseAdmin.auth.getUser(token);
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    const user = data?.user;
 
     if (error || !user) {
       return next(new AppError(401, 'INVALID_TOKEN', 'Invalid or expired token'));
