@@ -109,7 +109,7 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+CORS_ORIGINS=http://localhost:5174,http://localhost:5173,http://localhost:3000
 ```
 
 ### 3. Install Dependencies
@@ -148,14 +148,41 @@ Role checks use `app_metadata.role`. To promote your first admin:
 
 ---
 
-## 🧪 Testing with Test Tokens
+## 🧪 Testing with Test Tokens on Windows
 
-To obtain a Bearer token without opening the frontend (email/password only):
+To test authenticated routes locally without the frontend:
+
+### 1. Generate a test token
+In your terminal (PowerShell or cmd) from `backend/`:
 ```bash
-npm run token your-email@example.com your-password
+npm run token -- your-email@example.com your-password
 ```
-Copy the returned token and call the API:
-```bash
-curl -H "Authorization: Bearer <TOKEN>" http://localhost:4000/api/users/me
+
+### 2. Call `/api/users/me`
+
+**In Windows PowerShell:**
+```powershell
+$token = "PASTE_YOUR_ACCESS_TOKEN_HERE"
+Invoke-RestMethod -Uri "http://localhost:4000/api/users/me" -Headers @{ Authorization = "Bearer $token" }
 ```
-*(For Google OAuth users, obtain the token from the frontend Supabase session callback).*
+Or using curl in PowerShell:
+```powershell
+curl.exe -H "Authorization: Bearer PASTE_YOUR_ACCESS_TOKEN_HERE" http://localhost:4000/api/users/me
+```
+
+**In Command Prompt (cmd.exe):**
+```cmd
+curl -H "Authorization: Bearer PASTE_YOUR_ACCESS_TOKEN_HERE" http://localhost:4000/api/users/me
+```
+
+*(Note: Test token generation via script is for email/password users. For Google OAuth users, retrieve the access token from the frontend Supabase session callback).*
+
+---
+
+## 📋 Assumptions & Design Decisions
+
+1. **`app_metadata.role` Source of Truth**: The application strictly trusts `req.user.app_metadata.role` for role checks (defaulting to `'user'`). `user_metadata` is intentionally ignored for authorization since users can modify it directly.
+2. **Soft Deletion Policy**: Soft-deleted accounts have `profiles.deleted_at` set. `requireAuth` immediately intercepts requests from soft-deleted users and returns `403` with code `ACCOUNT_DELETED`.
+3. **Audit Log Error Isolation**: Failures in writing non-critical audit log rows do not abort successful user-facing soft deletions, ensuring high resilience while still logging errors to stdout.
+4. **CORS Configuration**: Supports both the default Vite development port (`5174`) and alternative frontend ports (`5173`, `3000`) without wildcards.
+
