@@ -16,6 +16,7 @@ import { ShareLinkScreen } from './components/Share/ShareLinkScreen';
 import { Layers, X, LogOut, User as UserIcon, AlertCircle } from 'lucide-react';
 import { useAuth } from './auth/useAuth';
 import { Mascot } from './components/common/Mascot';
+import { PillLoader } from './components/common/PillLoader';
 
 export type ScreenState = 
   | 'splash'
@@ -126,10 +127,11 @@ export function App() {
   // 1. Loading state: Session check or Profile loading
   if (isAppLoading) {
     return (
-      <div className="w-full min-h-screen bg-[#060608] flex items-center justify-center text-white">
-        <div className="flex flex-col items-center gap-4 animate-pulse">
+      <div className="w-full min-h-screen bg-background flex items-center justify-center text-foreground p-4">
+        <div className="flex flex-col items-center gap-5">
           <Mascot size={48} color="purple" />
-          <span className="text-sm font-semibold text-neutral-400">Loading Measure Me...</span>
+          <PillLoader />
+          <span className="text-xs font-semibold text-muted-foreground">Loading Measure Me...</span>
         </div>
       </div>
     );
@@ -138,25 +140,25 @@ export function App() {
   // 2. Profile fetch failed (network or server error): Show retry state without dropping into onboarding
   if (session && profileError) {
     return (
-      <div className="w-full min-h-screen bg-[#060608] flex items-center justify-center text-white p-4 font-sans">
-        <div className="w-full max-w-sm bg-[#0A0A0E] border border-white/10 rounded-3xl p-6 text-center flex flex-col items-center gap-4 shadow-2xl">
-          <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+      <div className="w-full min-h-screen bg-background flex items-center justify-center text-foreground p-4 font-sans">
+        <div className="w-full max-w-sm bg-card border border-border rounded-3xl p-6 text-center flex flex-col items-center gap-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-destructive/15 border border-destructive/25 flex items-center justify-center text-destructive">
             <AlertCircle className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Connection Error</h2>
-            <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">{profileError}</p>
+            <h2 className="text-lg font-bold text-card-foreground">Connection Error</h2>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{profileError}</p>
           </div>
           <div className="flex flex-col gap-2.5 w-full mt-2">
             <button
               onClick={() => retryLoadProfile()}
-              className="w-full h-11 rounded-full bg-[#6C47FF] hover:bg-[#5C37EF] text-white font-semibold text-xs tracking-wide transition-all cursor-pointer shadow-lg shadow-[#6C47FF]/25"
+              className="w-full h-11 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs tracking-wide transition-all cursor-pointer shadow-md"
             >
               Retry Connection
             </button>
             <button
               onClick={handleSignOut}
-              className="w-full h-10 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 font-medium text-xs transition-all cursor-pointer"
+              className="w-full h-10 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border font-medium text-xs transition-all cursor-pointer"
             >
               Sign out
             </button>
@@ -167,32 +169,32 @@ export function App() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-[#060608] text-white font-sans flex justify-center">
+    <div className="w-full min-h-screen bg-background text-foreground font-sans flex justify-center">
       {/* Centered mobile-first container */}
-      <div className="w-full max-w-md min-h-screen bg-[#0A0A0E] relative shadow-2xl overflow-x-hidden">
+      <div className="w-full max-w-md min-h-screen bg-card text-card-foreground relative shadow-2xl overflow-x-hidden border-x border-border/40">
         {/* Floating Screen Switcher Drawer for quick demo and testing */}
         <aside aria-label="Screen switcher" className="fixed top-3 right-4 z-50">
           <button
             onClick={() => setShowNavDrawer(!showNavDrawer)}
-            className="px-3 py-1.5 rounded-full bg-[#181824]/90 backdrop-blur-md border border-white/10 text-xs font-semibold text-white/80 hover:text-white hover:border-[#27D07F]/40 shadow-lg flex items-center gap-1.5 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-full bg-secondary/80 backdrop-blur-md border border-border text-xs font-semibold text-secondary-foreground hover:bg-secondary hover:border-primary/40 shadow-lg flex items-center gap-1.5 transition-all cursor-pointer"
             title="Switch Screen"
           >
-            <Layers className="w-3.5 h-3.5 text-[#27D07F]" />
+            <Layers className="w-3.5 h-3.5 text-primary" />
             <span>Screens</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 text-white/70">
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-background/50 text-foreground/80">
               {screens.find((s) => s.id === activeScreen)?.num}
             </span>
           </button>
 
           {showNavDrawer && (
-            <div className="absolute right-0 top-10 w-72 max-h-[82vh] overflow-y-auto bg-[#12121C]/95 backdrop-blur-xl border border-white/15 rounded-2xl p-3 shadow-2xl flex flex-col gap-1 z-50 animate-fade-in">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10 px-1">
-                <span className="text-xs font-bold text-white uppercase tracking-wider">
+            <div className="absolute right-0 top-10 w-72 max-h-[82vh] overflow-y-auto bg-popover/95 text-popover-foreground backdrop-blur-xl border border-border rounded-2xl p-3 shadow-2xl flex flex-col gap-1 z-50 animate-fade-in">
+              <div className="flex items-center justify-between pb-2 border-b border-border px-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-popover-foreground">
                   Mobile Screens
                 </span>
                 <button
                   onClick={() => setShowNavDrawer(false)}
-                  className="w-6 h-6 rounded-full hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white cursor-pointer"
+                  className="w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -200,17 +202,17 @@ export function App() {
 
               {/* User session status in drawer */}
               {session && (
-                <div className="p-2 my-1 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+                <div className="p-2 my-1 rounded-xl bg-muted border border-border flex items-center justify-between">
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <UserIcon className="w-3.5 h-3.5 text-[#27D07F] shrink-0" />
-                    <span className="text-xs text-white/90 truncate font-medium">{displayName}</span>
+                    <UserIcon className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="text-xs text-foreground truncate font-medium">{displayName}</span>
                   </div>
                   <button
                     onClick={() => {
                       handleSignOut();
                       setShowNavDrawer(false);
                     }}
-                    className="text-[11px] text-red-400 hover:text-red-300 flex items-center gap-1 font-semibold cursor-pointer shrink-0 ml-2"
+                    className="text-[11px] text-destructive hover:opacity-80 flex items-center gap-1 font-semibold cursor-pointer shrink-0 ml-2"
                   >
                     <LogOut className="w-3 h-3" />
                     <span>Sign out</span>
@@ -243,8 +245,8 @@ export function App() {
                     }}
                     className={`px-3 py-2 rounded-xl text-left text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
                       activeScreen === screen.id
-                        ? 'bg-[#27D07F] text-neutral-950 font-bold'
-                        : 'text-[#B4B1C9] hover:bg-white/5 hover:text-white'
+                        ? 'bg-primary text-primary-foreground font-bold shadow-xs'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
                     <span className="truncate">{screen.label}</span>

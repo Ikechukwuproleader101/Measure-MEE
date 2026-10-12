@@ -27,12 +27,12 @@ export const Mascot: React.FC<MascotProps> = ({
   const fillHex = color === 'white' 
     ? '#FFFFFF' 
     : color === 'green' 
-    ? '#27D07F' 
+    ? 'var(--primary)' 
     : color === 'purple' 
-    ? '#B69EFF' 
+    ? 'var(--accent)' 
     : color;
 
-  const eyeColor = color === 'white' ? '#14141E' : '#0A0A0E';
+  const eyeColor = color === 'white' ? 'var(--card)' : 'var(--background)';
 
   return (
     <svg 

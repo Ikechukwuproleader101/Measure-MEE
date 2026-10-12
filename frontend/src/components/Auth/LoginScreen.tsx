@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Mail, ArrowLeft, Mic, Smile, X, Check, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { supabase } from '../../lib/supabaseClient';
+import { PillSpinner } from '../common/PillLoader';
 
 interface LoginScreenProps {
   onBack?: () => void;
@@ -139,18 +140,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const row3Numbers = ['.', ',', '?', '!', "'", '"', '_'];
 
   return (
-    <div className="relative w-full h-full min-h-screen bg-[#F8F9FD] text-[#121625] flex flex-col justify-between overflow-x-hidden select-none font-sans">
+    <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between overflow-x-hidden select-none font-sans">
       {/* Toast notification */}
       {showToast && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-[#161839]/95 text-white px-4 py-2.5 rounded-full text-xs font-medium shadow-xl backdrop-blur-md flex items-center gap-2 border border-white/10 animate-fade-in">
-          <Check className="w-3.5 h-3.5 text-[#27D07F]" />
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-popover/95 text-popover-foreground px-4 py-2.5 rounded-full text-xs font-medium shadow-xl backdrop-blur-md flex items-center gap-2 border border-border animate-fade-in">
+          <Check className="w-3.5 h-3.5 text-primary" />
           <span>{showToast}</span>
         </div>
       )}
 
       {/* Top iOS Status Bar */}
-      <div className="w-full pt-3 pb-1 px-7 flex items-center justify-between text-neutral-900 z-20">
-        <div className="font-semibold text-[15px] tracking-tight text-[#161839]">
+      <div className="w-full pt-3 pb-1 px-7 flex items-center justify-between text-foreground z-20">
+        <div className="font-semibold text-[15px] tracking-tight text-foreground">
           9:41
         </div>
 
@@ -158,7 +159,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         {onBack && (
           <button
             onClick={onBack}
-            className="text-xs text-[#868CA8] hover:text-[#161839] flex items-center gap-1 transition-colors cursor-pointer"
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer"
             title="Back to Onboarding"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -166,13 +167,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </button>
         )}
 
-        <div className="flex items-center gap-1.5 text-[#161839]">
+        <div className="flex items-center gap-1.5 text-foreground">
           {/* Cellular Signal (4 bars) */}
           <div className="flex items-end gap-[1.5px] h-3">
-            <span className="w-[3px] h-1 bg-[#161839] rounded-[0.5px]" />
-            <span className="w-[3px] h-1.5 bg-[#161839] rounded-[0.5px]" />
-            <span className="w-[3px] h-2.2 bg-[#161839] rounded-[0.5px]" />
-            <span className="w-[3px] h-3 bg-[#161839] rounded-[0.5px]" />
+            <span className="w-[3px] h-1 bg-foreground rounded-[0.5px]" />
+            <span className="w-[3px] h-1.5 bg-foreground rounded-[0.5px]" />
+            <span className="w-[3px] h-2.2 bg-foreground rounded-[0.5px]" />
+            <span className="w-[3px] h-3 bg-foreground rounded-[0.5px]" />
           </div>
 
           {/* Wi-Fi Icon */}
@@ -181,8 +182,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </svg>
 
           {/* Battery Indicator */}
-          <div className="w-5 h-2.5 border-[1.2px] border-[#161839] rounded-[3px] p-[1px] ml-0.5 flex items-center">
-            <div className="w-full h-full bg-[#161839] rounded-[1px]" />
+          <div className="w-5 h-2.5 border-[1.2px] border-foreground rounded-[3px] p-[1px] ml-0.5 flex items-center">
+            <div className="w-full h-full bg-foreground rounded-[1px]" />
           </div>
         </div>
       </div>
@@ -201,13 +202,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
 
           {/* Title: Measure me */}
-          <h1 className="mt-3 text-[30px] font-extrabold tracking-tight text-[#161839] font-display flex items-center justify-center gap-1.5">
+          <h1 className="mt-3 text-[30px] font-extrabold tracking-tight text-foreground font-display flex items-center justify-center gap-1.5">
             <span>Measure</span>
-            <span className="text-[#6C3EE0]">me</span>
+            <span className="text-primary">me</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="mt-1.5 text-[14px] leading-snug text-[#868CA8] font-medium tracking-normal text-center">
+          <p className="mt-1.5 text-[14px] leading-snug text-muted-foreground font-medium tracking-normal text-center">
             Your body. Perfectly measured.
             <br />
             Anywhere.
@@ -224,12 +225,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             }}
             className={`relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 transition-all duration-200 cursor-text ${
               isFocused 
-                ? 'bg-[#EAE7F6] ring-2 ring-[#6C3EE0]/30 border border-[#DCD7F0]' 
-                : 'bg-[#EEEBF8] border border-[#E4E0F4]'
+                ? 'bg-card ring-2 ring-primary/30 border border-primary' 
+                : 'bg-card border border-border'
             }`}
           >
-            {/* Mail Icon in purple */}
-            <div className="shrink-0 text-[#6C3EE0]">
+            {/* Mail Icon in primary */}
+            <div className="shrink-0 text-primary">
               <Mail className="w-5 h-5 stroke-[2]" />
             </div>
 
@@ -245,7 +246,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 onBlur={() => setIsFocused(false)}
                 placeholder="Enter your email"
                 autoComplete="email"
-                className="w-full bg-transparent text-[#161839] text-[15px] font-normal tracking-normal focus:outline-hidden placeholder-[#868CA8]/70"
+                className="w-full bg-transparent text-foreground text-[15px] font-normal tracking-normal focus:outline-hidden placeholder:text-muted-foreground"
               />
             </div>
 
@@ -254,7 +255,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="button"
                 onClick={handleClearEmail}
-                className="w-5 h-5 rounded-full bg-[#BDB9D6] hover:bg-[#A9A4C6] text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="w-5 h-5 rounded-full bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 aria-label="Clear email"
               >
                 <X className="w-3 h-3 stroke-[2.5]" />
@@ -267,9 +268,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             onClick={() => {
               passwordRef.current?.focus();
             }}
-            className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#EEEBF8] border border-[#E4E0F4] focus-within:bg-[#EAE7F6] focus-within:ring-2 focus-within:ring-[#6C3EE0]/30 focus-within:border-[#DCD7F0] transition-all duration-200 cursor-text"
+            className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-card border border-border focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary transition-all duration-200 cursor-text"
           >
-            <div className="shrink-0 text-[#6C3EE0]">
+            <div className="shrink-0 text-primary">
               <Lock className="w-5 h-5 stroke-[2]" />
             </div>
 
@@ -282,14 +283,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 autoComplete="current-password"
-                className="w-full bg-transparent text-[#161839] text-[15px] font-normal tracking-normal focus:outline-hidden placeholder-[#868CA8]/70 pr-2"
+                className="w-full bg-transparent text-foreground text-[15px] font-normal tracking-normal focus:outline-hidden placeholder:text-muted-foreground pr-2"
               />
             </div>
 
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="text-[#868CA8] hover:text-[#161839] transition-colors cursor-pointer shrink-0"
+              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
               aria-label="Toggle password visibility"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -298,8 +299,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           {/* Error Banner if error exists */}
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2 text-xs text-red-600 animate-fade-in font-medium">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+            <div className="p-3 bg-destructive/10 border border-destructive/25 rounded-2xl flex items-center gap-2 text-xs text-destructive animate-fade-in font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0 text-destructive" />
               <span>{errorMsg}</span>
             </div>
           )}
@@ -308,16 +309,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-[52px] rounded-full bg-[#6C3EE0] hover:bg-[#5E32D0] active:bg-[#552ABE] text-white font-semibold text-[15px] tracking-tight flex items-center justify-center gap-1.5 shadow-md shadow-[#6C3EE0]/25 transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
+            aria-busy={isLoading}
+            className={`w-full h-[52px] rounded-full font-semibold text-[15px] tracking-tight flex items-center justify-center gap-1.5 transition-all duration-150 select-none ${
+              isLoading
+                ? 'bg-muted text-muted-foreground shadow-sm cursor-not-allowed'
+                : 'bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground shadow-md shadow-primary/25 cursor-pointer active:scale-[0.99]'
+            }`}
           >
             {isLoading ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                <span>Signing in...</span>
-              </span>
+              <PillSpinner />
             ) : (
               <>
                 <span>Sign in</span>
@@ -329,11 +329,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         {/* Divider: "or" */}
         <div className="flex items-center my-4 px-1">
-          <div className="flex-1 h-px bg-[#E8E6F0]" />
-          <span className="px-3 text-[13px] text-[#9298B6] font-normal lowercase tracking-normal">
+          <div className="flex-1 h-px bg-border" />
+          <span className="px-3 text-[13px] text-muted-foreground font-normal lowercase tracking-normal">
             or
           </span>
-          <div className="flex-1 h-px bg-[#E8E6F0]" />
+          <div className="flex-1 h-px bg-border" />
         </div>
 
         {/* Social Authentication Buttons */}
@@ -343,7 +343,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             type="button"
             disabled={isLoading}
             onClick={handleGoogleSignIn}
-            className="w-full h-[52px] rounded-full bg-white hover:bg-neutral-50/90 active:bg-neutral-100 border border-[#E5E3EE] text-[#121625] font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
+            className="w-full h-[52px] rounded-full bg-card hover:bg-muted active:bg-muted border border-border text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
           >
             {/* Google colored G icon */}
             <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
@@ -371,10 +371,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <button
             type="button"
             onClick={handleAppleSignIn}
-            className="w-full h-[52px] rounded-full bg-white hover:bg-neutral-50/90 active:bg-neutral-100 border border-[#E5E3EE] text-[#121625] font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 cursor-pointer active:scale-[0.99]"
+            className="w-full h-[52px] rounded-full bg-card hover:bg-muted active:bg-muted border border-border text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 cursor-pointer active:scale-[0.99]"
           >
-            {/* Apple black icon */}
-            <svg className="w-4.5 h-4.5 fill-black shrink-0" viewBox="0 0 170 170">
+            {/* Apple icon */}
+            <svg className="w-4.5 h-4.5 fill-current text-foreground shrink-0" viewBox="0 0 170 170">
               <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.74 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.08-7.7-7.89-12-14.43-6.19-9.47-10.9-20.48-14.13-33.03-3.23-12.56-4.85-24.3-4.85-35.24 0-14.61 3.69-26.79 11.07-36.54 7.39-9.76 16.63-14.77 27.72-15.03 4.58 0 9.87 1.25 15.87 3.75 6 2.5 10.22 3.82 12.66 3.97 1.9-.27 6.25-1.63 13.06-4.09 6.81-2.46 12.35-3.56 16.63-3.3 12.28.64 22.18 5.22 29.7 13.74-10.84 6.59-16.14 15.67-15.91 27.24.23 9.4 3.93 17.26 11.11 23.59 7.18 6.33 15.67 10.05 25.48 11.15-2.23 6.94-4.87 13.68-7.91 20.22zM119.22 31.84c0-7.39 2.63-14.14 7.89-20.25 5.26-6.12 11.75-9.98 19.46-11.59.34 1.12.51 2.37.51 3.75 0 7.39-2.73 14.28-8.19 20.67-5.46 6.39-11.95 10.15-19.46 11.27-.07-1.28-.21-2.56-.21-3.85z" />
             </svg>
             <span>Continue with Apple</span>
@@ -386,7 +386,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <button
             type="button"
             onClick={handleForgotPassword}
-            className="text-[13px] font-normal text-[#73779C] hover:text-[#6C3EE0] transition-colors cursor-pointer"
+            className="text-[13px] font-normal text-muted-foreground hover:text-primary transition-colors cursor-pointer"
           >
             Forgot your password?
           </button>
@@ -398,22 +398,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <button
               type="button"
               onClick={onCreateAccountClick}
-              className="text-[12px] font-medium text-[#868CA8] hover:text-[#161839] transition-colors cursor-pointer"
+              className="text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
-              Don't have an account? <span className="text-[#6C3EE0] font-semibold">Sign up</span>
+              Don't have an account? <span className="text-primary font-semibold">Sign up</span>
             </button>
           </div>
         )}
       </div>
 
       {/* Simulated iOS Virtual Keyboard toggle */}
-      <div className="w-full flex flex-col justify-end bg-[#E2E1EB] pt-1.5 pb-2 border-t border-[#D7D5E4] shadow-inner select-none transition-all">
-        <div className="px-4 py-1 flex items-center justify-between text-[11px] text-[#73779C]">
+      <div className="w-full flex flex-col justify-end bg-card/95 pt-1.5 pb-2 border-t border-border shadow-inner select-none transition-all">
+        <div className="px-4 py-1 flex items-center justify-between text-[11px] text-muted-foreground">
           <span className="font-medium tracking-wide">English (US)</span>
           <button
             type="button"
             onClick={() => setShowKeyboard(!showKeyboard)}
-            className="px-2 py-0.5 rounded-md hover:bg-black/5 font-semibold text-[#6C3EE0] cursor-pointer transition-colors"
+            className="px-2 py-0.5 rounded-md hover:bg-muted font-semibold text-primary cursor-pointer transition-colors"
           >
             {showKeyboard ? 'Hide keyboard ▾' : 'Show keyboard ▴'}
           </button>
@@ -452,7 +452,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 type="button"
                 onClick={() => setIsShiftActive(!isShiftActive)}
                 className={`w-[42px] h-[42px] rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center transition-colors cursor-pointer ${
-                  isShiftActive ? 'bg-white text-black' : 'bg-[#B7B5C7] text-neutral-800'
+                  isShiftActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}
                 aria-label="Shift"
               >
@@ -467,7 +467,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     key={key}
                     type="button"
                     onClick={() => handleVirtualKeyPress(key)}
-                    className="flex-1 h-[42px] max-w-[34px] bg-white active:bg-neutral-200 rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-[19px] font-normal text-black cursor-pointer transition-transform active:scale-95"
+                    className="flex-1 h-[42px] max-w-[34px] bg-card active:bg-muted rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-[19px] font-normal text-foreground cursor-pointer transition-transform active:scale-95 border border-border"
                   >
                     {isShiftActive ? key.toUpperCase() : key}
                   </button>
@@ -477,7 +477,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="button"
                 onClick={handleVirtualBackspace}
-                className="w-[42px] h-[42px] bg-[#B7B5C7] active:bg-neutral-300 rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-neutral-800 cursor-pointer transition-colors active:scale-95"
+                className="w-[42px] h-[42px] bg-muted active:bg-muted/80 rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-muted-foreground cursor-pointer transition-colors active:scale-95"
                 aria-label="Backspace"
               >
                 <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -490,7 +490,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setIsNumberPad(!isNumberPad)}
-                className="w-[74px] h-[42px] bg-[#B7B5C7] active:bg-neutral-300 rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-[15px] font-medium text-black cursor-pointer"
+                className="w-[74px] h-[42px] bg-muted active:bg-muted/80 rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-[15px] font-medium text-foreground cursor-pointer"
               >
                 {isNumberPad ? 'ABC' : '123'}
               </button>
@@ -498,7 +498,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="button"
                 onClick={handleVirtualSpace}
-                className="flex-1 h-[42px] bg-white active:bg-neutral-200 rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-[15px] font-normal text-black cursor-pointer active:scale-98"
+                className="flex-1 h-[42px] bg-card active:bg-muted rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-[15px] font-normal text-foreground cursor-pointer active:scale-98 border border-border"
               >
                 space
               </button>
@@ -506,28 +506,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="button"
                 onClick={() => handleContinue()}
-                className="w-[74px] h-[42px] bg-[#B7B5C7] hover:bg-[#A8A6B8] active:bg-neutral-300 rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-[15px] font-normal text-black cursor-pointer transition-colors"
+                className="w-[74px] h-[42px] bg-primary hover:bg-primary/90 active:bg-primary/80 rounded-[5px] shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center text-[15px] font-normal text-primary-foreground cursor-pointer transition-colors"
               >
                 return
               </button>
             </div>
 
-            <div className="flex items-center justify-between px-5 pt-3 pb-1 text-[#4A475A]">
+            <div className="flex items-center justify-between px-5 pt-3 pb-1 text-muted-foreground">
               <button
                 type="button"
                 onClick={() => triggerToast('Emoji keyboard')}
-                className="w-8 h-8 flex items-center justify-center hover:text-black cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center hover:text-foreground cursor-pointer"
                 aria-label="Emoji"
               >
                 <Smile className="w-6 h-6 stroke-[1.6]" />
               </button>
 
-              <div className="w-34 h-1 bg-[#1A1A1A] rounded-full mx-auto" />
+              <div className="w-34 h-1 bg-muted-foreground/30 rounded-full mx-auto" />
 
               <button
                 type="button"
                 onClick={() => triggerToast('Dictation activated')}
-                className="w-8 h-8 flex items-center justify-center hover:text-black cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center hover:text-foreground cursor-pointer"
                 aria-label="Dictation"
               >
                 <Mic className="w-6 h-6 stroke-[1.6]" />
@@ -538,7 +538,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         {!showKeyboard && (
           <div className="w-full flex justify-center py-2">
-            <div className="w-34 h-1 bg-[#1A1A1A] rounded-full" />
+            <div className="w-34 h-1 bg-muted-foreground/30 rounded-full" />
           </div>
         )}
       </div>

@@ -11,10 +11,10 @@ export function Badge({
   ...props
 }: BadgeProps) {
   const variants = {
-    default: 'bg-[#27D07F]/15 text-[#27D07F] border-[#27D07F]/20',
-    purple: 'bg-[#B69EFF]/15 text-[#B69EFF] border-[#B69EFF]/20',
-    secondary: 'bg-white/10 text-white/80 border-white/10',
-    outline: 'border-white/20 text-white',
+    default: 'bg-primary/15 text-primary border-primary/25',
+    purple: 'bg-accent/15 text-accent border-accent/25',
+    secondary: 'bg-secondary text-secondary-foreground border-border',
+    outline: 'border-border text-foreground',
   };
 
   return (
