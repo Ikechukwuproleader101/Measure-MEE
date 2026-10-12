@@ -69,7 +69,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         <div className="flex items-center justify-between mb-8">
           <button 
             onClick={onBack}
-            className="w-10 h-10 rounded-full bg-secondary hover:bg-secondary/80 border border-border flex items-center justify-center text-secondary-foreground transition-all cursor-pointer active:scale-95"
+            className="w-10 h-10 rounded-full bg-secondary hover:bg-secondary/80 shadow-sm border-0 flex items-center justify-center text-secondary-foreground transition-all cursor-pointer active:scale-95"
             aria-label="Back"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -111,7 +111,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="e.g. Ada Lovelace"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-2xl px-4 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
+                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
               />
               <User className="absolute right-4 w-4 h-4 text-muted-foreground" />
             </div>
@@ -127,7 +127,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ada@example.com"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-2xl px-4 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
+                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
               />
               <Mail className="absolute right-4 w-4 h-4 text-muted-foreground" />
             </div>
@@ -143,7 +143,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter a secure password (min. 8 characters)"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-2xl px-4 pr-11 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
+                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 pr-11 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
               />
               <button
                 type="button"
@@ -158,7 +158,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
           {/* Error Banner */}
           {errorMsg && (
-            <div className="p-3 bg-destructive/10 border border-destructive/25 rounded-2xl flex items-center gap-2 text-xs text-destructive animate-fade-in font-medium">
+            <div className="p-3 bg-destructive/10 rounded-2xl flex items-center gap-2 text-xs text-destructive animate-fade-in font-medium border-0">
               <AlertCircle className="w-4 h-4 shrink-0 text-destructive" />
               <span>{errorMsg}</span>
             </div>
@@ -166,7 +166,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
           {/* Confirmation Required Banner */}
           {confirmationRequired && (
-            <div className="p-3 bg-primary/10 border border-primary/25 rounded-2xl flex items-center gap-2 text-xs text-primary animate-fade-in font-medium">
+            <div className="p-3 bg-primary/10 rounded-2xl flex items-center gap-2 text-xs text-primary animate-fade-in font-medium border-0">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-primary" />
               <span>Check your email to confirm your account before logging in.</span>
             </div>
@@ -177,7 +177,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
             type="submit"
             disabled={isLoading}
             isLoading={isLoading}
-            className="w-full h-13 mt-4"
+            className="w-full h-13 mt-4 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md shadow-primary/25 border-0"
           >
             Create account
           </Button>

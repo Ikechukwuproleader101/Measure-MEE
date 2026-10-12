@@ -143,7 +143,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between overflow-x-hidden select-none font-sans">
       {/* Toast notification */}
       {showToast && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-popover/95 text-popover-foreground px-4 py-2.5 rounded-full text-xs font-medium shadow-xl backdrop-blur-md flex items-center gap-2 border border-border animate-fade-in">
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-popover/95 text-popover-foreground px-4 py-2.5 rounded-full text-xs font-medium shadow-xl backdrop-blur-md flex items-center gap-2 border-0 animate-fade-in">
           <Check className="w-3.5 h-3.5 text-primary" />
           <span>{showToast}</span>
         </div>
@@ -223,15 +223,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               inputRef.current?.focus();
               setIsFocused(true);
             }}
-            className={`relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 transition-all duration-200 cursor-text ${
+            className={`relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 transition-all duration-200 cursor-text shadow-sm border-0 ${
               isFocused 
-                ? 'bg-card ring-2 ring-primary/30 border border-primary' 
-                : 'bg-card border border-border'
+                ? 'bg-card ring-2 ring-primary/25' 
+                : 'bg-card'
             }`}
           >
-            {/* Mail Icon in primary */}
-            <div className="shrink-0 text-primary">
-              <Mail className="w-5 h-5 stroke-[2]" />
+            {/* Mail Icon in circular badge */}
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+              <Mail className="w-4 h-4 stroke-[2]" />
             </div>
 
             {/* Real Editable Input */}
@@ -268,10 +268,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             onClick={() => {
               passwordRef.current?.focus();
             }}
-            className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-card border border-border focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary transition-all duration-200 cursor-text"
+            className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-card shadow-sm border-0 focus-within:ring-2 focus-within:ring-primary/25 transition-all duration-200 cursor-text"
           >
-            <div className="shrink-0 text-primary">
-              <Lock className="w-5 h-5 stroke-[2]" />
+            {/* Lock Icon in circular badge */}
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+              <Lock className="w-4 h-4 stroke-[2]" />
             </div>
 
             <div className="relative flex-1 flex items-center overflow-hidden">
@@ -299,7 +300,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           {/* Error Banner if error exists */}
           {errorMsg && (
-            <div className="p-3 bg-destructive/10 border border-destructive/25 rounded-2xl flex items-center gap-2 text-xs text-destructive animate-fade-in font-medium">
+            <div className="p-3 bg-destructive/10 rounded-2xl flex items-center gap-2 text-xs text-destructive animate-fade-in font-medium border-0">
               <AlertCircle className="w-4 h-4 shrink-0 text-destructive" />
               <span>{errorMsg}</span>
             </div>
@@ -329,11 +330,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         {/* Divider: "or" */}
         <div className="flex items-center my-4 px-1">
-          <div className="flex-1 h-px bg-border" />
+          <div className="flex-1 h-[1px] bg-border/40" />
           <span className="px-3 text-[13px] text-muted-foreground font-normal lowercase tracking-normal">
             or
           </span>
-          <div className="flex-1 h-px bg-border" />
+          <div className="flex-1 h-[1px] bg-border/40" />
         </div>
 
         {/* Social Authentication Buttons */}
@@ -343,7 +344,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             type="button"
             disabled={isLoading}
             onClick={handleGoogleSignIn}
-            className="w-full h-[52px] rounded-full bg-card hover:bg-muted active:bg-muted border border-border text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
+            className="w-full h-[52px] rounded-full bg-card hover:bg-muted active:bg-muted text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-3 shadow-sm border-0 transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
           >
             {/* Google colored G icon */}
             <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
@@ -371,7 +372,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <button
             type="button"
             onClick={handleAppleSignIn}
-            className="w-full h-[52px] rounded-full bg-card hover:bg-muted active:bg-muted border border-border text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 cursor-pointer active:scale-[0.99]"
+            className="w-full h-[52px] rounded-full bg-card hover:bg-muted active:bg-muted text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-3 shadow-sm border-0 transition-all duration-150 cursor-pointer active:scale-[0.99]"
           >
             {/* Apple icon */}
             <svg className="w-4.5 h-4.5 fill-current text-foreground shrink-0" viewBox="0 0 170 170">
