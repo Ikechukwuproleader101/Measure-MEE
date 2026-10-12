@@ -186,6 +186,10 @@
     outline: none !important;
     box-shadow: none;
   }
+  input::placeholder, textarea::placeholder {
+    color: oklch(0.50 0.025 280) !important;
+    opacity: 1 !important;
+  }
   body {
     @apply bg-background text-foreground;
   }

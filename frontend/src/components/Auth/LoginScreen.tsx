@@ -188,7 +188,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <Mail className="w-4 h-4 stroke-[2]" />
             </div>
 
-            {/* Real Editable Input - Guaranteed No Outline */}
+            {/* Real Editable Input - Guaranteed No Outline & Non-White Placeholder */}
             <div className="relative flex-1 flex items-center overflow-hidden">
               <input
                 ref={inputRef}
@@ -200,7 +200,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 onBlur={() => setIsFocused(false)}
                 placeholder="Enter your email"
                 autoComplete="email"
-                className="w-full bg-transparent text-foreground text-[15px] font-normal tracking-normal border-0 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 shadow-none placeholder:text-muted-foreground select-text"
+                className="w-full bg-transparent text-foreground text-[15px] font-normal tracking-normal border-0 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 shadow-none placeholder:text-[#727088] placeholder:opacity-100 select-text"
               />
             </div>
 
@@ -238,7 +238,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 autoComplete="current-password"
-                className="w-full bg-transparent text-foreground text-[15px] font-normal tracking-normal border-0 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 shadow-none placeholder:text-muted-foreground pr-2 select-text"
+                className="w-full bg-transparent text-foreground text-[15px] font-normal tracking-normal border-0 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 shadow-none placeholder:text-[#727088] placeholder:opacity-100 pr-2 select-text"
               />
             </div>
 
@@ -260,12 +260,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
           )}
 
-          {/* Primary Continue Button */}
+          {/* Primary Continue Button - Identical width and geometry to inputs */}
           <button
             type="submit"
             disabled={isLoading}
             aria-busy={isLoading}
-            className={`w-full h-[52px] rounded-full font-semibold text-[15px] tracking-tight flex items-center justify-center gap-1.5 transition-all duration-150 select-none border-0 ${
+            className={`w-full h-[54px] rounded-2xl font-bold text-[15px] tracking-tight flex items-center justify-center gap-1.5 transition-all duration-150 select-none border-0 ${
               isLoading
                 ? 'bg-muted text-muted-foreground shadow-sm cursor-not-allowed'
                 : 'bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground shadow-md shadow-primary/25 cursor-pointer active:scale-[0.99]'
@@ -298,7 +298,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             type="button"
             disabled={isLoading}
             onClick={handleGoogleSignIn}
-            className="w-full h-[52px] rounded-full bg-card hover:bg-muted active:bg-muted text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-3 shadow-sm border-0 transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
+            className="w-full h-[54px] rounded-2xl bg-card hover:bg-muted active:bg-muted text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-3 shadow-sm border-0 transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
           >
             {/* Google colored G icon inside circular badge */}
             <div className="w-7 h-7 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
@@ -328,7 +328,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <button
             type="button"
             onClick={handleAppleSignIn}
-            className="w-full h-[52px] rounded-full bg-card hover:bg-muted active:bg-muted text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-3 shadow-sm border-0 transition-all duration-150 cursor-pointer active:scale-[0.99]"
+            className="w-full h-[54px] rounded-2xl bg-card hover:bg-muted active:bg-muted text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-3 shadow-sm border-0 transition-all duration-150 cursor-pointer active:scale-[0.99]"
           >
             {/* Apple icon inside circular badge */}
             <div className="w-7 h-7 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
