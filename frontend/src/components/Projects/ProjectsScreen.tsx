@@ -74,20 +74,20 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
       <div className="px-6 py-2 flex items-center gap-2">
         <button
           onClick={() => setFilter('active')}
-          className={`px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+          className={`px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer border-0 shadow-sm ${
             filter === 'active'
               ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border'
+              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
           }`}
         >
           Active
         </button>
         <button
           onClick={() => setFilter('archived')}
-          className={`px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+          className={`px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer border-0 shadow-sm ${
             filter === 'archived'
               ? 'bg-primary text-primary-foreground'
-              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border'
+              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
           }`}
         >
           Archived
@@ -100,27 +100,29 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
           <div
             key={project.id}
             onClick={() => onOpenProject(project.id)}
-            className="rounded-2xl bg-card border border-border p-4 hover:border-primary/30 transition-all cursor-pointer group text-card-foreground"
+            className="rounded-2xl bg-card p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group text-card-foreground border-0"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-11 h-11 rounded-xl border flex items-center justify-center ${project.folderColor}`}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${project.folderColor.replace('rounded-xl', 'rounded-full').replace(/border[^\s]*/g, '')}`}>
                   <Folder className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm text-card-foreground group-hover:text-primary transition-colors">
+                  <h3 className="font-bold text-sm text-card-foreground group-hover:text-primary transition-colors">
                     {project.title}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">{project.subtitle}</p>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <div className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
             </div>
 
             {/* Progress indicator */}
-            <div className="mt-3 pt-3 border-t border-border">
+            <div className="mt-3.5 pt-3.5 border-t border-border/40">
               <div className="flex items-center justify-between text-[11px] mb-1.5">
-                <span className="text-muted-foreground flex items-center gap-1">
+                <span className="text-muted-foreground flex items-center gap-1 font-medium">
                   {project.progress === 100 ? (
                     <CheckCircle2 className="w-3 h-3 text-primary" />
                   ) : (
@@ -128,9 +130,9 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
                   )}
                   {project.stage}
                 </span>
-                <span className="text-muted-foreground font-medium">{project.progress}%</span>
+                <span className="text-muted-foreground font-semibold">{project.progress}%</span>
               </div>
-              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
                     project.progress === 100 ? 'bg-primary' : 'bg-accent'
@@ -144,7 +146,7 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
       </main>
 
       {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-card/95 backdrop-blur-md border-t border-border px-6 py-2.5 flex items-center justify-around z-30">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-card/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.12)] px-6 py-3 flex items-center justify-around z-30 border-0">
         <button 
           onClick={onBackToHome}
           className="flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
