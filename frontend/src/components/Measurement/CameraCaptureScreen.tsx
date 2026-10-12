@@ -189,16 +189,6 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
         />
       )}
 
-      {/* Ambient Depth Scanning Mesh (AR Background effect) */}
-      {!hasCameraStream && (
-        <div 
-          className="absolute inset-0 z-0 opacity-30 pointer-events-none"
-          style={{
-            backgroundImage: 'radial-gradient(circle at center, var(--primary) 0%, transparent 70%)',
-          }}
-        />
-      )}
-
       {/* Top Floating Notification */}
       {notification && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-card/90 backdrop-blur-md border border-border px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2 animate-fade-in text-xs font-medium text-foreground">
