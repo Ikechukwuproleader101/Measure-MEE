@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, Check, AlertCircle, ArrowRight, RotateCcw, User, Zap, ZapOff } from 'lucide-react';
+import { useMediaPipePose } from '../../hooks/useMediaPipePose';
 
 /**
  * BodyCamera Component
@@ -40,6 +41,32 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
+
+  // Real-time on-device MediaPipe Pose detection & A-pose tracking
+  const {
+    isReady: isPoseReady,
+    isLoading: isPoseLoading,
+    isValid: isPoseValid,
+    reasons: poseReasons,
+    landmarks: poseLandmarks,
+  } = useMediaPipePose(videoRef, {
+    enabled: !holdingState.isHolding,
+    viewMode,
+    fps: 15,
+  });
+
+  // Log tracking status to console for live monitoring
+  useEffect(() => {
+    if (isPoseReady) {
+      console.log('[MediaPipe Pose Tracker]', {
+        active: true,
+        ready: isPoseReady,
+        valid: isPoseValid,
+        landmarksCount: poseLandmarks ? poseLandmarks.length : 0,
+        hint: poseReasons[0] || 'Valid',
+      });
+    }
+  }, [isPoseReady, isPoseValid, poseLandmarks, poseReasons]);
 
   // 1. Initialize High-Resolution getUserMedia Stream
   useEffect(() => {
@@ -362,27 +389,33 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
           </div>
         )}
 
-        {/* Viewfinder Brackets */}
-        <div className="absolute top-2 left-6 w-9 h-9 border-t-[2.5px] border-l-[2.5px] border-primary/80 rounded-tl-2xl pointer-events-none" />
-        <div className="absolute top-2 right-6 w-9 h-9 border-t-[2.5px] border-r-[2.5px] border-primary/80 rounded-tr-2xl pointer-events-none" />
-        <div className="absolute bottom-24 left-6 w-9 h-9 border-b-[2.5px] border-l-[2.5px] border-primary/80 rounded-bl-2xl pointer-events-none" />
-        <div className="absolute bottom-24 right-6 w-9 h-9 border-b-[2.5px] border-r-[2.5px] border-primary/80 rounded-br-2xl pointer-events-none" />
+        {/* Viewfinder Brackets - Glow green when pose is valid */}
+        <div className={`absolute top-2 left-6 w-9 h-9 border-t-[2.5px] border-l-[2.5px] rounded-tl-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
+        <div className={`absolute top-2 right-6 w-9 h-9 border-t-[2.5px] border-r-[2.5px] rounded-tr-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
+        <div className={`absolute bottom-24 left-6 w-9 h-9 border-b-[2.5px] border-l-[2.5px] rounded-bl-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
+        <div className={`absolute bottom-24 right-6 w-9 h-9 border-b-[2.5px] border-r-[2.5px] rounded-br-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
 
         {/* Center Vertical Hairline Alignment Line */}
-        <div className="absolute inset-y-4 left-1/2 -translate-x-1/2 w-[1px] bg-primary/30 pointer-events-none" />
+        <div className={`absolute inset-y-4 left-1/2 -translate-x-1/2 w-[1px] pointer-events-none transition-colors duration-300 ${isPoseValid ? 'bg-emerald-400/70' : 'bg-primary/30'}`} />
 
-        {/* Distance guidance pill */}
+        {/* Distance guidance pill - Live dynamic guidance */}
         {!holdingState.isHolding && (
           <div className="mt-auto mb-3 px-5 py-2 rounded-full bg-card/90 backdrop-blur-md border border-border shadow-lg flex items-center gap-3 animate-fade-in z-20">
-            <div className="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">
-              <User className="w-4 h-4 fill-current" />
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+              isPoseValid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-primary/20 text-primary'
+            }`}>
+              {isPoseValid ? <Check className="w-4 h-4 stroke-[2.5]" /> : <User className="w-4 h-4 fill-current" />}
             </div>
             <div className="flex flex-col text-left">
               <span className="text-xs font-bold text-foreground leading-tight">
-                Stand 2 meters back
+                {isPoseLoading
+                  ? 'Loading pose tracker...'
+                  : isPoseValid
+                  ? 'Pose Locked & Stable'
+                  : poseReasons[0] || 'Stand 2 meters back'}
               </span>
               <span className="text-[11px] text-muted-foreground leading-tight">
-                (Full body must be visible)
+                {isPoseValid ? '(Ready to capture)' : '(Full body must be visible)'}
               </span>
             </div>
           </div>
@@ -432,10 +465,16 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
                 type="button"
                 onClick={() => setCountdown(3)}
                 disabled={countdown !== null}
-                className="w-20 h-20 rounded-full border-4 border-primary/35 p-1.5 flex items-center justify-center active:scale-95 transition-all cursor-pointer group shadow-lg shadow-primary/20 hover:border-primary/60 disabled:opacity-50"
+                className={`w-20 h-20 rounded-full border-4 p-1.5 flex items-center justify-center active:scale-95 transition-all cursor-pointer group shadow-lg ${
+                  isPoseValid
+                    ? 'border-emerald-500/80 hover:border-emerald-400 shadow-emerald-500/20'
+                    : 'border-primary/35 hover:border-primary/60 shadow-primary/20'
+                } disabled:opacity-50`}
                 aria-label="Capture photo"
               >
-                <div className="w-full h-full rounded-full bg-primary flex items-center justify-center group-hover:bg-primary/90 transition-colors shadow-inner" />
+                <div className={`w-full h-full rounded-full transition-colors shadow-inner flex items-center justify-center ${
+                  isPoseValid ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-primary group-hover:bg-primary/90'
+                }`} />
               </button>
             </div>
 
