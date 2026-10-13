@@ -111,7 +111,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="e.g. Ada Lovelace"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
+                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 text-sm text-foreground placeholder:text-[#727088] placeholder:opacity-100 transition-all outline-none focus:outline-none"
               />
               <User className="absolute right-4 w-4 h-4 text-muted-foreground" />
             </div>
@@ -127,7 +127,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ada@example.com"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
+                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 text-sm text-foreground placeholder:text-[#727088] placeholder:opacity-100 transition-all outline-none focus:outline-none"
               />
               <Mail className="absolute right-4 w-4 h-4 text-muted-foreground" />
             </div>
@@ -143,7 +143,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter a secure password (min. 8 characters)"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 pr-11 text-sm text-foreground placeholder:text-muted-foreground transition-all focus:outline-hidden"
+                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 pr-11 text-sm text-foreground placeholder:text-[#727088] placeholder:opacity-100 transition-all outline-none focus:outline-none"
               />
               <button
                 type="button"

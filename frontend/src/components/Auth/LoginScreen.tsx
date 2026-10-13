@@ -170,14 +170,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         </div>
 
         {/* Input & Form Controls - Clean Flat, Zero Outline */}
-        <form onSubmit={handleContinue} className="flex flex-col gap-3.5 w-full">
+        <form onSubmit={handleContinue} className="flex flex-col gap-3.5 w-full items-stretch">
           {/* Email Input Field */}
           <div 
             onClick={() => {
               inputRef.current?.focus();
               setIsFocused(true);
             }}
-            className={`relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 transition-all duration-200 cursor-text border-0 ${
+            className={`relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 transition-all duration-200 cursor-text border-0 box-border ${
               isFocused 
                 ? 'bg-card shadow-md shadow-primary/10' 
                 : 'bg-card shadow-sm'
@@ -222,7 +222,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             onClick={() => {
               passwordRef.current?.focus();
             }}
-            className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-card shadow-sm border-0 focus-within:shadow-md focus-within:shadow-primary/10 transition-all duration-200 cursor-text"
+            className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-card shadow-sm border-0 focus-within:shadow-md focus-within:shadow-primary/10 transition-all duration-200 cursor-text box-border"
           >
             {/* Lock Icon in circular badge */}
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary">
@@ -265,7 +265,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             type="submit"
             disabled={isLoading}
             aria-busy={isLoading}
-            className={`w-full h-[54px] rounded-2xl font-bold text-[15px] tracking-tight flex items-center justify-center gap-1.5 transition-all duration-150 select-none border-0 ${
+            className={`w-full h-[54px] rounded-2xl font-bold text-[15px] tracking-tight flex items-center justify-center gap-1.5 transition-all duration-150 select-none border-0 box-border ${
               isLoading
                 ? 'bg-muted text-muted-foreground shadow-sm cursor-not-allowed'
                 : 'bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground shadow-md shadow-primary/25 cursor-pointer active:scale-[0.99]'
