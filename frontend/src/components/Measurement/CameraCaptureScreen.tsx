@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Zap, ZapOff, User, Image as ImageIcon, RefreshCw, Check } from 'lucide-react';
-import { useMediaPipePose } from '../../hooks/useMediaPipePose';
+import { usePoseValidation } from '../../features/capture/usePoseValidation';
 
 interface CameraCaptureScreenProps {
   onBack: () => void;
@@ -24,34 +24,33 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
   const [notification, setNotification] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Real-time on-device MediaPipe Pose detection & tracking
+  // Real-time on-device MediaPipe Pose detection & A-pose validation
   const {
-    isReady: isPoseReady,
-    isLoading: isPoseLoading,
     isValid: isPoseValid,
-    reasons: poseReasons,
-    landmarks: poseLandmarks,
-  } = useMediaPipePose(videoRef, {
+    hint: poseHint,
+    isReady: isPoseReady,
+    error: poseError,
+  } = usePoseValidation({
+    videoRef,
+    canvasRef,
     enabled: hasCameraStream,
-    viewMode,
-    fps: 15,
   });
 
-  // Log tracking status to DevTools console
-  useEffect(() => {
-    if (isPoseReady) {
-      console.log('[MediaPipe Pose Tracker]', {
-        active: true,
-        ready: isPoseReady,
-        valid: isPoseValid,
-        landmarksCount: poseLandmarks ? poseLandmarks.length : 0,
-        hint: poseReasons[0] || 'Valid',
-      });
-    }
-  }, [isPoseReady, isPoseValid, poseLandmarks, poseReasons]);
+  const isPersonInView = isPoseReady && !isPoseValid && poseHint !== 'Step into the camera view' && poseHint !== 'Getting ready...';
+  const frameOutlineClass = isPoseValid
+    ? 'outline outline-4 outline-[#22c55e] -outline-offset-4 shadow-[inset_0_0_24px_rgba(34,197,94,0.35)]'
+    : isPersonInView
+    ? 'outline outline-4 outline-[#ef4444] -outline-offset-4 shadow-[inset_0_0_24px_rgba(239,68,68,0.35)]'
+    : '';
+  const cornerColorClass = isPoseValid
+    ? 'border-[#22c55e]'
+    : isPersonInView
+    ? 'border-[#ef4444]'
+    : 'border-primary/80';
 
   // Initialize webcam feed if supported
   useEffect(() => {
@@ -126,11 +125,12 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
   };
 
   const handleTrigger = () => {
-    if (countdown !== null) return;
+    if (!isPoseValid || countdown !== null) return;
     setCountdown(3);
   };
 
   const executeCapture = () => {
+    if (!isPoseValid) return;
     // Trigger shutter screen flash
     setIsScreenFlashing(true);
     setTimeout(() => setIsScreenFlashing(false), 200);
@@ -215,6 +215,10 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
           className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 brightness-95"
         />
       )}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none"
+      />
 
       {/* Top Floating Notification */}
       {notification && (
@@ -263,12 +267,12 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
       </header>
 
       {/* Viewfinder Canvas Area with Anatomical Silhouette */}
-      <main className="relative flex-1 flex flex-col items-center justify-center overflow-hidden px-4 z-10 my-1">
+      <main className={`relative flex-1 flex flex-col items-center justify-center overflow-hidden px-4 z-10 my-1 transition-all duration-300 rounded-3xl ${frameOutlineClass}`}>
         {/* Corner Brackets */}
-        <div className={`absolute top-2 left-6 w-9 h-9 border-t-[2.5px] border-l-[2.5px] rounded-tl-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
-        <div className={`absolute top-2 right-6 w-9 h-9 border-t-[2.5px] border-r-[2.5px] rounded-tr-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
-        <div className={`absolute bottom-24 left-6 w-9 h-9 border-b-[2.5px] border-l-[2.5px] rounded-bl-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
-        <div className={`absolute bottom-24 right-6 w-9 h-9 border-b-[2.5px] border-r-[2.5px] rounded-br-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
+        <div className={`absolute top-2 left-6 w-9 h-9 border-t-[2.5px] border-l-[2.5px] rounded-tl-2xl pointer-events-none transition-colors duration-300 ${cornerColorClass}`} />
+        <div className={`absolute top-2 right-6 w-9 h-9 border-t-[2.5px] border-r-[2.5px] rounded-tr-2xl pointer-events-none transition-colors duration-300 ${cornerColorClass}`} />
+        <div className={`absolute bottom-24 left-6 w-9 h-9 border-b-[2.5px] border-l-[2.5px] rounded-bl-2xl pointer-events-none transition-colors duration-300 ${cornerColorClass}`} />
+        <div className={`absolute bottom-24 right-6 w-9 h-9 border-b-[2.5px] border-r-[2.5px] rounded-br-2xl pointer-events-none transition-colors duration-300 ${cornerColorClass}`} />
 
         {/* Center Vertical Hairline Alignment Line */}
         <div className={`absolute inset-y-4 left-1/2 -translate-x-1/2 w-[1px] pointer-events-none transition-colors duration-300 ${isPoseValid ? 'bg-emerald-400/70' : 'bg-primary/30'}`} />
@@ -439,20 +443,26 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
         {/* Gating Instruction Pill */}
         <div className="mt-auto mb-3 px-5 py-2 rounded-full bg-card/90 backdrop-blur-md border border-border shadow-lg flex items-center gap-3 animate-fade-in z-20">
           <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-            isPoseValid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-primary/20 text-primary'
+            isPoseValid
+              ? 'bg-emerald-500/20 text-emerald-400'
+              : isPersonInView
+              ? 'bg-red-500/20 text-red-400'
+              : 'bg-primary/20 text-primary'
           }`}>
             {isPoseValid ? <Check className="w-4 h-4 stroke-[2.5]" /> : <User className="w-4 h-4 fill-current" />}
           </div>
           <div className="flex flex-col text-left">
             <span className="text-xs font-bold text-foreground leading-tight">
-              {isPoseLoading
-                ? 'Loading pose tracker...'
-                : isPoseValid
-                ? 'Pose Locked & Stable'
-                : poseReasons[0] || 'Stand 2 meters back'}
+              {poseError ? 'Pose detection error' : poseHint}
             </span>
             <span className="text-[11px] text-muted-foreground leading-tight">
-              {isPoseValid ? '(Ready to capture)' : '(Full body must be visible)'}
+              {poseError
+                ? poseError
+                : isPoseValid
+                ? '(Ready to capture)'
+                : !isPoseReady
+                ? 'Initializing...'
+                : '(Full body must be visible)'}
             </span>
           </div>
         </div>
@@ -521,16 +531,16 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
           <button
             type="button"
             onClick={handleTrigger}
-            disabled={countdown !== null}
+            disabled={!isPoseValid || countdown !== null}
             className={`w-20 h-20 rounded-full border-4 p-1.5 flex items-center justify-center active:scale-95 transition-all cursor-pointer group shadow-lg ${
               isPoseValid
                 ? 'border-emerald-500/80 hover:border-emerald-400 shadow-emerald-500/20'
-                : 'border-primary/35 hover:border-primary/60 shadow-primary/20'
+                : 'border-primary/35 opacity-50 cursor-not-allowed shadow-none'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
             aria-label="Capture photo"
           >
             <div className={`w-full h-full rounded-full transition-colors shadow-inner flex items-center justify-center ${
-              isPoseValid ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-primary group-hover:bg-primary/90'
+              isPoseValid ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-primary/50'
             }`} />
           </button>
         </div>

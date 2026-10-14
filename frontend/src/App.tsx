@@ -1,6 +1,3 @@
-// TEMP TEST - REMOVE
-import PoseTest from './features/capture/PoseTest';
-
 import { useState, useEffect, useCallback } from 'react';
 import { SplashScreen } from './components/Splash/SplashScreen';
 import { OnboardingCarousel } from './components/Onboarding/OnboardingCarousel';
@@ -175,11 +172,6 @@ export function App() {
     <div className="w-full min-h-screen bg-background text-foreground font-sans flex justify-center">
       {/* Centered mobile-first container */}
       <div className="w-full max-w-md min-h-screen bg-card text-card-foreground relative shadow-2xl overflow-x-hidden border-x border-border/40">
-        {/* TEMP TEST - REMOVE */}
-        <div className="w-full bg-neutral-900 border-b border-neutral-700 z-40 relative">
-          <PoseTest />
-        </div>
-
         {/* Floating Screen Switcher Drawer for quick demo and testing */}
         <aside aria-label="Screen switcher" className="fixed top-3 right-4 z-50">
           <button
