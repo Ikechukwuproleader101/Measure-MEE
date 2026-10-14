@@ -71,11 +71,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfileError(null);
       }
       setLoading(false);
-
-      // Clean OAuth hash/query fragments from URL if present
-      if (window.location.hash.includes('access_token') || window.location.search.includes('code=')) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
     });
 
     return () => {

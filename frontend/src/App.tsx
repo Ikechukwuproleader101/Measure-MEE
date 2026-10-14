@@ -15,7 +15,6 @@ import { CommentsScreen } from './components/Comments/CommentsScreen';
 import { ShareLinkScreen } from './components/Share/ShareLinkScreen';
 import { Layers, X, LogOut, User as UserIcon, AlertCircle } from 'lucide-react';
 import { useAuth } from './auth/useAuth';
-import { Mascot } from './components/common/Mascot';
 import { PillLoader } from './components/common/PillLoader';
 
 export type ScreenState = 
@@ -47,7 +46,23 @@ export function App() {
     retryLoadProfile, 
     signOut 
   } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState<ScreenState>('splash');
+  const [hasSeenSplash, setHasSeenSplash] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('measure_me_has_seen_splash') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [currentScreen, setCurrentScreen] = useState<ScreenState>(() => {
+    try {
+      if (localStorage.getItem('measure_me_has_seen_splash') === 'true') {
+        return 'login';
+      }
+    } catch {
+      // ignore
+    }
+    return 'splash';
+  });
   const [intendedScreen, setIntendedScreen] = useState<ScreenState | null>(null);
   const [showNavDrawer, setShowNavDrawer] = useState(false);
 
@@ -61,7 +76,14 @@ export function App() {
   // - Logged in + onboarding_completed = false: onboarding screen only.
   // - Logged in + onboarding_completed = true: main app. Pre-login/onboarding redirect to dashboard.
   const getCanonicalScreen = useCallback((screen: ScreenState): ScreenState => {
+    if (!hasSeenSplash && screen === 'splash') {
+      return 'splash';
+    }
+
     if (!isAuthed) {
+      if (screen === 'splash') {
+        return hasSeenSplash ? 'login' : 'splash';
+      }
       if (!PRE_LOGIN_SCREENS.includes(screen)) {
         return 'login';
       }
@@ -77,7 +99,7 @@ export function App() {
     }
 
     return screen;
-  }, [isAuthed, hasCompletedOnboarding, intendedScreen]);
+  }, [hasSeenSplash, isAuthed, hasCompletedOnboarding, intendedScreen]);
 
   const activeScreen = getCanonicalScreen(currentScreen);
 
@@ -124,15 +146,11 @@ export function App() {
     user?.email?.split('@')[0] ||
     'Ada';
 
-  // 1. Loading state: Session check or Profile loading
+  // 1. Loading state: Session check or Profile loading (neutral spinner without mascot icon)
   if (isAppLoading) {
     return (
       <div className="w-full min-h-screen bg-background flex items-center justify-center text-foreground p-4">
-        <div className="flex flex-col items-center gap-5">
-          <Mascot size={48} color="purple" />
-          <PillLoader />
-          <span className="text-xs font-semibold text-muted-foreground">Loading Measure Me...</span>
-        </div>
+        <PillLoader />
       </div>
     );
   }
@@ -262,7 +280,15 @@ export function App() {
         <main className="w-full min-h-screen">
           {activeScreen === 'splash' && (
             <SplashScreen 
-              onContinue={() => setCurrentScreen('login')} 
+              onContinue={() => {
+                try {
+                  localStorage.setItem('measure_me_has_seen_splash', 'true');
+                } catch {
+                  // ignore
+                }
+                setHasSeenSplash(true);
+                setCurrentScreen(isAuthed ? (hasCompletedOnboarding ? 'dashboard' : 'onboarding') : 'login');
+              }} 
             />
           )}
 

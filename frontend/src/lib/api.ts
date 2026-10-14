@@ -49,8 +49,15 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   });
 
   if (response.status === 401) {
-    // Session is invalid or revoked on the backend
-    await supabase.auth.signOut();
+    // Attempt session refresh before determining if auth is truly revoked
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        await supabase.auth.signOut();
+      }
+    } catch {
+      await supabase.auth.signOut();
+    }
     throw new Error('UNAUTHORIZED');
   }
 
