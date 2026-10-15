@@ -7,7 +7,7 @@
     "dev": "vite --open",
     "build": "tsc -b && vite build",
     "lint": "oxlint src",
-    "test": "node --test src/features/capture/*.test.js",
+    "test": "node --test src/features/capture/*.test.js src/features/capture/analysis/*.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

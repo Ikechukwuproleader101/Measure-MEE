@@ -5,13 +5,17 @@ import {
   INITIAL_CAPTURE_STATE,
   setHeightAction,
   goToStepAction,
+  startCameraAction,
   setCaptureAction,
-  retakeAction,
+  cancelCameraAction,
+  clearCaptureAction,
+  startAnalysisAction,
   resetAction,
 } from "./captureSession.js";
 
-const createMockCapture = (view) => ({
+const createMockCapture = (view, source = "camera", valid = true) => ({
   view,
+  source,
   imageBlob: {},
   previewUrl: `blob:http://localhost/${view}-123`,
   width: 1280,
@@ -20,80 +24,125 @@ const createMockCapture = (view) => ({
   worldLandmarks: Array(33).fill({ x: 0.5, y: 0.5, z: 0 }),
   mask: { data: new Uint8Array(10), width: 10, height: 1 },
   capturedAt: Date.now(),
+  valid,
+  validationError: valid ? null : "Straighten your arms",
 });
 
-test("1. side step cannot start without front capture", () => {
+test("1. Front and side captures can be set in either order", () => {
   let state = INITIAL_CAPTURE_STATE;
   state = captureReducer(state, setHeightAction(175));
-  state = captureReducer(state, goToStepAction("prep"));
-  assert.equal(state.step, "prep");
+  state = captureReducer(state, goToStepAction("hub"));
+  assert.equal(state.step, "hub");
 
-  // Attempt to jump straight to side without front
-  state = captureReducer(state, goToStepAction("side"));
-  assert.equal(state.step, "prep", "Step must not change to side without front capture");
+  // Fill SIDE first
+  const sideMock = createMockCapture("side", "upload");
+  state = captureReducer(state, setCaptureAction("side", sideMock));
+  assert.equal(state.side, sideMock);
+  assert.equal(state.front, null);
+  assert.equal(state.step, "hub");
 
-  // Now set front capture
-  const frontMock = createMockCapture("front");
+  // Fill FRONT second
+  const frontMock = createMockCapture("front", "camera");
   state = captureReducer(state, setCaptureAction("front", frontMock));
-  state = captureReducer(state, goToStepAction("side"));
-  assert.equal(state.step, "side", "Step can now transition to side");
+  assert.equal(state.front, frontMock);
+  assert.equal(state.side, sideMock);
+  assert.equal(state.step, "hub");
 });
 
-test("2. done is unreachable unless height, front, and side are all present", () => {
+test("2. startAnalysis fails unless height, front, and side all exist", () => {
   let state = INITIAL_CAPTURE_STATE;
 
-  // No height, no front, no side
-  state = captureReducer(state, goToStepAction("done"));
+  // Missing everything
+  state = captureReducer(state, startAnalysisAction());
   assert.equal(state.step, "height");
 
-  // Only height
+  // Height only
   state = captureReducer(state, setHeightAction(180));
-  state = captureReducer(state, goToStepAction("done"));
+  state = captureReducer(state, startAnalysisAction());
   assert.equal(state.step, "height");
 
-  // Height and front only
-  state = captureReducer(state, setCaptureAction("front", createMockCapture("front")));
-  state = captureReducer(state, goToStepAction("done"));
-  assert.equal(state.step, "height");
-
-  // Height, front, and side all present
+  // Height and side only
   state = captureReducer(state, setCaptureAction("side", createMockCapture("side")));
-  state = captureReducer(state, goToStepAction("done"));
-  assert.equal(state.step, "done", "Done is reached once all prerequisites exist");
+  state = captureReducer(state, startAnalysisAction());
+  assert.notEqual(state.step, "analyzing");
+
+  // Height, side, and front present
+  state = captureReducer(state, setCaptureAction("front", createMockCapture("front")));
+  state = captureReducer(state, startAnalysisAction());
+  assert.equal(state.step, "analyzing", "Should transition to analyzing when all 3 exist");
 });
 
-test("3. retake clears only that view and navigates back to view step", () => {
+test("3. setCapture returns to hub and clears cameraView", () => {
+  let state = INITIAL_CAPTURE_STATE;
+  state = captureReducer(state, startCameraAction("front"));
+  assert.equal(state.step, "camera");
+  assert.equal(state.cameraView, "front");
+
+  const frontCapture = createMockCapture("front");
+  state = captureReducer(state, setCaptureAction("front", frontCapture));
+  assert.equal(state.step, "hub");
+  assert.equal(state.cameraView, null);
+  assert.equal(state.front, frontCapture);
+});
+
+test("4. cancelCamera returns to hub with nothing else changed", () => {
   let state = INITIAL_CAPTURE_STATE;
   state = captureReducer(state, setHeightAction(170));
+  const sideCapture = createMockCapture("side");
+  state = captureReducer(state, setCaptureAction("side", sideCapture));
+
+  state = captureReducer(state, startCameraAction("front"));
+  assert.equal(state.step, "camera");
+  assert.equal(state.cameraView, "front");
+
+  state = captureReducer(state, cancelCameraAction());
+  assert.equal(state.step, "hub");
+  assert.equal(state.cameraView, null);
+  assert.equal(state.side, sideCapture);
+  assert.equal(state.front, null);
+});
+
+test("5. clearCapture clears only that slot and preserves the other", () => {
+  let state = INITIAL_CAPTURE_STATE;
   const frontCapture = createMockCapture("front");
   const sideCapture = createMockCapture("side");
 
   state = captureReducer(state, setCaptureAction("front", frontCapture));
   state = captureReducer(state, setCaptureAction("side", sideCapture));
-  state = captureReducer(state, goToStepAction("reviewSide"));
 
-  // Retake side
-  state = captureReducer(state, retakeAction("side"));
-  assert.equal(state.side, null, "Side capture must be cleared");
-  assert.equal(state.front, frontCapture, "Front capture must remain untouched");
-  assert.equal(state.step, "side", "Step must return to side");
-
-  // Retake front
-  state = captureReducer(state, retakeAction("front"));
-  assert.equal(state.front, null, "Front capture must be cleared");
-  assert.equal(state.step, "front", "Step must return to front");
+  state = captureReducer(state, clearCaptureAction("front"));
+  assert.equal(state.front, null);
+  assert.equal(state.side, sideCapture);
 });
 
-test("4. reset clears everything back to initial state", () => {
+test("6. reset clears everything back to initial state", () => {
   let state = INITIAL_CAPTURE_STATE;
   state = captureReducer(state, setHeightAction(168));
   state = captureReducer(state, setCaptureAction("front", createMockCapture("front")));
   state = captureReducer(state, setCaptureAction("side", createMockCapture("side")));
-  state = captureReducer(state, goToStepAction("done"));
-
-  assert.equal(state.step, "done");
-  assert.equal(state.heightCm, 168);
+  state = captureReducer(state, startAnalysisAction());
+  assert.equal(state.step, "analyzing");
 
   state = captureReducer(state, resetAction());
   assert.deepEqual(state, INITIAL_CAPTURE_STATE);
+});
+
+test("7. Editing height keeps existing photos", () => {
+  let state = INITIAL_CAPTURE_STATE;
+  state = captureReducer(state, setHeightAction(170));
+  const frontCapture = createMockCapture("front");
+  const sideCapture = createMockCapture("side");
+  state = captureReducer(state, setCaptureAction("front", frontCapture));
+  state = captureReducer(state, setCaptureAction("side", sideCapture));
+
+  // Edit height
+  state = captureReducer(state, goToStepAction("height"));
+  assert.equal(state.step, "height");
+  assert.equal(state.front, frontCapture, "Front photo must be preserved when editing height");
+  assert.equal(state.side, sideCapture, "Side photo must be preserved when editing height");
+
+  state = captureReducer(state, setHeightAction(172));
+  assert.equal(state.heightCm, 172);
+  assert.equal(state.front, frontCapture);
+  assert.equal(state.side, sideCapture);
 });

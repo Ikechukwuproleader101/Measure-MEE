@@ -1,17 +1,17 @@
 /**
  * In-memory Capture Session State & Reducer
  *
- * Enforces workflow state transitions and stores captured frames in RAM.
- * Nothing is persisted to localStorage, cookies, or remote network.
+ * Flow: height -> prep -> hub -> camera (for one view) -> back to hub -> analyzing -> done
+ * Front and side can be filled in either order via camera or upload.
+ * Zero persistence outside memory.
  */
 
 export const CAPTURE_STEPS = [
   "height",
   "prep",
-  "front",
-  "reviewFront",
-  "side",
-  "reviewSide",
+  "hub",
+  "camera",
+  "analyzing",
   "done",
 ];
 
@@ -20,6 +20,7 @@ export const INITIAL_CAPTURE_STATE = {
   heightCm: null,
   front: null,
   side: null,
+  cameraView: null, // "front" | "side" | null
 };
 
 function safelyRevokeUrl(url) {
@@ -46,7 +47,10 @@ export function captureReducer(state = INITIAL_CAPTURE_STATE, action) {
     case "SET_HEIGHT": {
       return {
         ...state,
-        heightCm: typeof action.heightCm === "number" ? action.heightCm : Number(action.heightCm) || null,
+        heightCm:
+          typeof action.heightCm === "number"
+            ? action.heightCm
+            : Number(action.heightCm) || null,
       };
     }
 
@@ -56,14 +60,9 @@ export function captureReducer(state = INITIAL_CAPTURE_STATE, action) {
         return state;
       }
 
-      // Rule: front must exist before side can start or be reviewed
-      if ((targetStep === "side" || targetStep === "reviewSide") && !state.front) {
-        return state;
-      }
-
-      // Rule: done is only reachable when heightCm, front, and side are all present
+      // analyzing & done require height, front, and side to be present
       if (
-        targetStep === "done" &&
+        (targetStep === "analyzing" || targetStep === "done") &&
         (state.heightCm === null || state.heightCm === undefined || !state.front || !state.side)
       ) {
         return state;
@@ -75,31 +74,69 @@ export function captureReducer(state = INITIAL_CAPTURE_STATE, action) {
       };
     }
 
+    case "START_CAMERA": {
+      const view = action.view;
+      if (view !== "front" && view !== "side") {
+        return state;
+      }
+      return {
+        ...state,
+        cameraView: view,
+        step: "camera",
+      };
+    }
+
     case "SET_CAPTURE": {
       const { view, result } = action;
       if (view !== "front" && view !== "side") {
         return state;
       }
+      // If replacing an existing capture with a different preview URL, revoke the old one
+      if (state[view]?.previewUrl && state[view].previewUrl !== result?.previewUrl) {
+        safelyRevokeUrl(state[view].previewUrl);
+      }
       return {
         ...state,
         [view]: result,
+        cameraView: null,
+        step: "hub",
       };
     }
 
-    case "RETAKE": {
+    case "CANCEL_CAMERA": {
+      return {
+        ...state,
+        cameraView: null,
+        step: "hub",
+      };
+    }
+
+    case "CLEAR_CAPTURE": {
       const view = action.view;
       if (view !== "front" && view !== "side") {
         return state;
       }
-
       if (state[view]?.previewUrl) {
         safelyRevokeUrl(state[view].previewUrl);
       }
-
       return {
         ...state,
         [view]: null,
-        step: view,
+      };
+    }
+
+    case "START_ANALYSIS": {
+      if (
+        state.heightCm === null ||
+        state.heightCm === undefined ||
+        !state.front ||
+        !state.side
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        step: "analyzing",
       };
     }
 
@@ -123,6 +160,9 @@ export function captureReducer(state = INITIAL_CAPTURE_STATE, action) {
 // Action Creators
 export const setHeightAction = (heightCm) => ({ type: "SET_HEIGHT", heightCm });
 export const goToStepAction = (step) => ({ type: "GO_TO", step });
+export const startCameraAction = (view) => ({ type: "START_CAMERA", view });
 export const setCaptureAction = (view, result) => ({ type: "SET_CAPTURE", view, result });
-export const retakeAction = (view) => ({ type: "RETAKE", view });
+export const cancelCameraAction = () => ({ type: "CANCEL_CAMERA" });
+export const clearCaptureAction = (view) => ({ type: "CLEAR_CAPTURE", view });
+export const startAnalysisAction = () => ({ type: "START_ANALYSIS" });
 export const resetAction = () => ({ type: "RESET" });

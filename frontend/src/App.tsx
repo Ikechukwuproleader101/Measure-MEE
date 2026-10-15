@@ -327,7 +327,7 @@ export function App() {
           {activeScreen === 'dashboard' && (
             <DashboardScreen
               userName={displayName}
-              onStartMeasurement={() => setCurrentScreen('measurement-guide')}
+              onStartMeasurement={() => setCurrentScreen('camera-capture')}
               onOpenProjects={() => setCurrentScreen('projects')}
               onOpenProjectDetails={(_id) => setCurrentScreen('project-details')}
               onShareLink={() => setCurrentScreen('share-link')}
@@ -347,7 +347,7 @@ export function App() {
             <ProjectDetailsScreen
               onBack={() => setCurrentScreen('projects')}
               onSelectGarment={(_id) => setCurrentScreen('garment-canvas')}
-              onAddMeasurement={() => setCurrentScreen('measurement-guide')}
+              onAddMeasurement={() => setCurrentScreen('camera-capture')}
               onOpenComments={() => setCurrentScreen('comments')}
               onShareLink={() => setCurrentScreen('share-link')}
             />
