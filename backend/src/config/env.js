@@ -10,7 +10,8 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url({ message: 'SUPABASE_URL must be a valid URL' }),
   SUPABASE_ANON_KEY: z.string().min(1, { message: 'SUPABASE_ANON_KEY is required' }),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, { message: 'SUPABASE_SERVICE_ROLE_KEY is required' }),
-  CORS_ORIGINS: z.string().default('http://localhost:5174,http://localhost:5173,http://localhost:3000'),
+  CORS_ORIGINS: z.string().optional(),
+  FRONTEND_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -23,9 +24,18 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+// Parse allowed origins from environment variables (CORS_ORIGINS or FRONTEND_URL) or default to localhost
+const originSources = [parsed.data.CORS_ORIGINS, parsed.data.FRONTEND_URL].filter(Boolean);
+const rawOrigins = originSources.length > 0
+  ? originSources.join(',')
+  : 'http://localhost:5174,http://localhost:5173,http://localhost:3000';
+
+const corsOriginsList = rawOrigins
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
 export const env = {
   ...parsed.data,
-  corsOriginsList: parsed.data.CORS_ORIGINS.split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  corsOriginsList,
 };
