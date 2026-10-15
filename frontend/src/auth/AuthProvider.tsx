@@ -7,10 +7,30 @@ import { AuthContext } from './AuthContext';
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfileResponse['profile'] | null>(null);
+  const [profile, setProfile] = useState<UserProfileResponse['profile'] | null>(() => {
+    try {
+      const cached = localStorage.getItem('measure_me_cached_profile');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+
+  const saveProfile = (newProfile: UserProfileResponse['profile'] | null) => {
+    setProfile(newProfile);
+    try {
+      if (newProfile) {
+        localStorage.setItem('measure_me_cached_profile', JSON.stringify(newProfile));
+      } else {
+        localStorage.removeItem('measure_me_cached_profile');
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   // Fetch backend profile data when user session exists
   const loadProfile = async () => {
@@ -18,11 +38,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfileError(null);
     try {
       const data = await getMe();
-      setProfile(data.profile);
+      saveProfile(data.profile);
       setProfileError(null);
     } catch (err: unknown) {
       if (err instanceof Error && err.message === 'UNAUTHORIZED') {
-        setProfile(null);
+        saveProfile(null);
         setSession(null);
         setUser(null);
         setProfileError(null);
@@ -37,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeOnboarding = async () => {
     const data = await updateProfile({ onboarding_completed: true });
-    setProfile(data.profile);
+    saveProfile(data.profile);
   };
 
   useEffect(() => {
@@ -48,12 +68,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!isMounted) return;
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
+      setLoading(false);
+
       if (initialSession?.user) {
-        loadProfile().finally(() => {
-          if (isMounted) setLoading(false);
-        });
-      } else {
-        setLoading(false);
+        loadProfile();
       }
     });
 
@@ -66,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentSession?.user) {
         loadProfile();
       } else {
-        setProfile(null);
+        saveProfile(null);
         setProfileLoading(false);
         setProfileError(null);
       }
@@ -126,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.auth.signOut();
     setSession(null);
     setUser(null);
-    setProfile(null);
+    saveProfile(null);
     if (error) {
       throw error;
     }

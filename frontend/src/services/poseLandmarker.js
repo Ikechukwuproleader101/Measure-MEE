@@ -115,8 +115,71 @@ export async function getPoseLandmarker(options = {}) {
   return landmarkerPromise;
 }
 
+let captureLandmarkerInstance = null;
+let captureLandmarkerPromise = null;
+
 /**
- * Safely closes and releases the PoseLandmarker instance.
+ * Creates or retrieves the singleton PoseLandmarker instance configured for capture.
+ * runningMode: "IMAGE", numPoses: 1, outputSegmentationMasks: true.
+ * Uses GPU then falls back to CPU. Created once and reused.
+ * 
+ * @returns {Promise<PoseLandmarker>}
+ */
+export async function getCaptureLandmarker() {
+  if (captureLandmarkerInstance) {
+    return captureLandmarkerInstance;
+  }
+
+  if (captureLandmarkerPromise) {
+    return captureLandmarkerPromise;
+  }
+
+  captureLandmarkerPromise = (async () => {
+    try {
+      const vision = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
+
+      try {
+        captureLandmarkerInstance = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: '/models/pose_landmarker_lite.task',
+            delegate: 'GPU',
+          },
+          runningMode: 'IMAGE',
+          numPoses: 1,
+          outputSegmentationMasks: true,
+          minPoseDetectionConfidence: 0.5,
+          minPosePresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+      } catch (gpuError) {
+        console.warn('MediaPipe GPU delegate failed for capture landmarker, falling back to CPU:', gpuError);
+        captureLandmarkerInstance = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: '/models/pose_landmarker_lite.task',
+            delegate: 'CPU',
+          },
+          runningMode: 'IMAGE',
+          numPoses: 1,
+          outputSegmentationMasks: true,
+          minPoseDetectionConfidence: 0.5,
+          minPosePresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+      }
+
+      return captureLandmarkerInstance;
+    } catch (err) {
+      console.error('Failed to initialize capture PoseLandmarker:', err);
+      captureLandmarkerPromise = null;
+      throw err;
+    }
+  })();
+
+  return captureLandmarkerPromise;
+}
+
+/**
+ * Safely closes and releases both PoseLandmarker instances.
  */
 export async function closePoseLandmarker() {
   if (landmarkerInstance) {
@@ -128,4 +191,15 @@ export async function closePoseLandmarker() {
     landmarkerInstance = null;
   }
   landmarkerPromise = null;
+
+  if (captureLandmarkerInstance) {
+    try {
+      await captureLandmarkerInstance.close();
+    } catch (err) {
+      console.warn('Error closing capture PoseLandmarker instance:', err);
+    }
+    captureLandmarkerInstance = null;
+  }
+  captureLandmarkerPromise = null;
 }
+

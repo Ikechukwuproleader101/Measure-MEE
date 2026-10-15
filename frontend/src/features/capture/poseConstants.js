@@ -4,6 +4,7 @@ export const IDX = {
   leftElbow: 13, rightElbow: 14,
   leftWrist: 15, rightWrist: 16,
   leftHip: 23, rightHip: 24,
+  leftKnee: 25, rightKnee: 26,
   leftAnkle: 27, rightAnkle: 28,
 };
 
@@ -24,8 +25,21 @@ export const THRESHOLDS = {
   maxDetectionsPerSecond: 15,
 };
 
+export const SIDE_THRESHOLDS = {
+  minVisibility: 0.5,        // only the camera-facing side is required
+  frameMargin: 0.02,
+  bodyHeightMin: 0.55,       // nose to ankle as fraction of frame height
+  bodyHeightMax: 0.92,
+  maxShoulderSeparation: 0.35, // shoulder-to-shoulder distance / torso length
+  maxArmAngle: 30,           // degrees at the shoulder between torso and arm
+  maxLean: 0.2,              // |shoulder x - ankle x| / body height
+};
+
+export const COUNTDOWN_SECONDS = 3;
+
 export const COLORS = {
   valid: "#22c55e",   // green
   invalid: "#ef4444", // red
   none: "#ffffff",    // no person in view
 };
+

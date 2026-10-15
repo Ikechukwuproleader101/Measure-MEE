@@ -13,11 +13,18 @@ import { validateAPose } from "./validateAPose.js";
  * @param {boolean} [params.enabled=true]
  * @returns {{ isValid: boolean, hint: string, isReady: boolean, error: string | null }}
  */
-export function usePoseValidation({ videoRef, canvasRef, enabled = true }) {
+export function usePoseValidation({ videoRef, canvasRef, enabled = true, validator = validateAPose }) {
   const [isValid, setIsValid] = useState(false);
   const [hint, setHint] = useState("Getting ready...");
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState(null);
+
+  const validatorRef = useRef(validator);
+  useEffect(() => {
+    validatorRef.current = validator;
+    consecutiveValidRef.current = 0;
+    consecutiveInvalidRef.current = 0;
+  }, [validator]);
 
   const landmarkerRef = useRef(null);
   const animFrameIdRef = useRef(null);
@@ -135,8 +142,9 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true }) {
             }
             updateHintState("Step into the camera view");
           } else {
-            // Person detected: run A-pose validator
-            const validation = validateAPose(landmarks, {
+            // Person detected: run validator
+            const currentValidator = validatorRef.current || validateAPose;
+            const validation = currentValidator(landmarks, {
               width: video.videoWidth,
               height: video.videoHeight,
             });
