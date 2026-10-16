@@ -24,16 +24,24 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+export function normalizeOrigin(value) {
+  return String(value || '').trim().replace(/\/+$/, '').toLowerCase();
+}
+
 // Parse allowed origins from environment variables (CORS_ORIGINS or FRONTEND_URL) or default to localhost
 const originSources = [parsed.data.CORS_ORIGINS, parsed.data.FRONTEND_URL].filter(Boolean);
 const rawOrigins = originSources.length > 0
   ? originSources.join(',')
-  : 'http://localhost:5174,http://localhost:5173,http://localhost:3000';
+  : (parsed.data.NODE_ENV === 'production' ? '' : 'http://localhost:5174,http://localhost:5173,http://localhost:3000');
 
 const corsOriginsList = rawOrigins
   .split(',')
-  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .map(normalizeOrigin)
   .filter(Boolean);
+
+if (parsed.data.NODE_ENV === 'production' && corsOriginsList.length === 0) {
+  console.warn('No CORS origins configured; all browser requests from other origins will be blocked.');
+}
 
 export const env = {
   ...parsed.data,

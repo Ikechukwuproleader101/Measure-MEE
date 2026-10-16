@@ -1,6 +1,15 @@
 import { supabase } from './supabaseClient';
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+function getApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!envUrl || !envUrl.trim()) {
+    if (import.meta.env.PROD) {
+      throw new Error('API address is not configured');
+    }
+    return 'http://localhost:4000';
+  }
+  return envUrl.trim().replace(/\/+$/, '');
+}
 
 export interface UserProfileResponse {
   user: {
@@ -32,6 +41,7 @@ export interface UserProfileResponse {
  * and handles 401 unauthenticated session revocation.
  */
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const baseUrl = getApiBaseUrl();
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
@@ -42,7 +52,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const url = `${apiBaseUrl.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
+  const url = `${baseUrl}/${endpoint.replace(/^\//, '')}`;
   const response = await fetch(url, {
     ...options,
     headers,

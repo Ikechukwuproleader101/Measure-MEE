@@ -4,7 +4,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
-import { env } from './config/env.js';
+import { env, normalizeOrigin } from './config/env.js';
 import { healthRoutes } from './modules/health/health.routes.js';
 import { usersRoutes } from './modules/users/users.routes.js';
 import { notFound } from './middleware/notFound.js';
@@ -12,30 +12,29 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 // 1. Helmet security headers
 app.use(helmet());
 
 // 2. CORS configuration (environment-driven origins, credentials, and preflight support)
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
-    if (!origin) return callback(null, true);
-
-    const normalizedOrigin = origin.replace(/\/+$/, '');
-
-    if (env.corsOriginsList.includes(normalizedOrigin) || env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS policy'));
+    if (!origin) return callback(null, true); // curl, server-to-server, same-origin
+    const normalized = normalizeOrigin(origin);
+    if (env.corsOriginsList.includes(normalized) || env.NODE_ENV !== 'production') {
+      return callback(null, true);
     }
+    console.warn(`CORS blocked origin: ${normalized}`);
+    return callback(null, false); // no CORS headers, no 500
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable preflight across all routes
+
 
 // 3. Body parser with payload size limit
 app.use(express.json({ limit: '1mb' }));
