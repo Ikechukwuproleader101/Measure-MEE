@@ -23,3 +23,9 @@ export declare const COLORS: {
   invalid: string;
   none: string;
 };
+
+export declare function guideState(params?: {
+  personVisible?: boolean;
+  isValid?: boolean;
+}): 'idle' | 'invalid' | 'valid';
+

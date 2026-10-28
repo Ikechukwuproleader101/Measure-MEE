@@ -43,3 +43,10 @@ export const COLORS = {
   none: "#ffffff",    // no person in view
 };
 
+export function guideState({ personVisible = false, isValid = false } = {}) {
+  if (isValid) return "valid";
+  if (personVisible) return "invalid";
+  return "idle";
+}
+
+

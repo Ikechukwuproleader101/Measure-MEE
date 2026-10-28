@@ -10,6 +10,7 @@ export interface UsePoseValidationOptions {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   enabled?: boolean;
   validator?: PoseValidator;
+  showSkeleton?: boolean;
 }
 
 export interface UsePoseValidationResult {
@@ -17,6 +18,7 @@ export interface UsePoseValidationResult {
   hint: string;
   isReady: boolean;
   error: string | null;
+  personVisible: boolean;
 }
 
 export declare function usePoseValidation(
@@ -24,4 +26,3 @@ export declare function usePoseValidation(
 ): UsePoseValidationResult;
 
 export default usePoseValidation;
-

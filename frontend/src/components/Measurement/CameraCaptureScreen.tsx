@@ -21,6 +21,9 @@ import { usePoseValidation } from '../../features/capture/usePoseValidation';
 import { validateAPose } from '../../features/capture/validateAPose';
 import { validateSidePose } from '../../features/capture/validateSidePose';
 import { COUNTDOWN_SECONDS } from '../../features/capture/poseConstants';
+import { guideState } from '../../features/capture/guideState';
+import { parsePoseDebug } from '../../features/capture/poseGuide';
+import { PoseGuideOverlay } from '../../features/capture/PoseGuideOverlay';
 import { captureFrame, processUploadedImage } from '../../features/capture/captureFrame';
 import {
   captureReducer,
@@ -73,10 +76,12 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraContainerRef = useRef<HTMLDivElement | null>(null);
 
   const isCameraActive = session.step === 'camera';
   const activeCameraView = session.cameraView || 'front';
   const activeValidator = activeCameraView === 'front' ? validateAPose : validateSidePose;
+  const isDebugPose = typeof window !== 'undefined' ? parsePoseDebug(window.location) : false;
 
   // Real-time on-device MediaPipe Pose detection (only active during camera step)
   const {
@@ -84,11 +89,13 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
     hint: poseHint,
     isReady: isPoseReady,
     error: poseError,
+    personVisible,
   } = usePoseValidation({
     videoRef,
     canvasRef,
     enabled: isCameraActive && hasCameraStream && !isCapturing,
     validator: activeValidator,
+    showSkeleton: isDebugPose,
   });
 
   const showNotification = (msg: string) => {
@@ -778,11 +785,8 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
   // Render Step 4: Camera Viewfinder
   // ==========================================
   if (session.step === 'camera') {
-    const isPersonInView =
-      isPoseReady &&
-      !isPoseValid &&
-      poseHint !== 'Step into the camera view' &&
-      poseHint !== 'Getting ready...';
+    const isPersonInView = personVisible && !isPoseValid;
+    const currentGuideState = guideState({ personVisible, isValid: isPoseValid });
 
     const frameOutlineClass = isPoseValid
       ? 'outline outline-4 outline-[#22c55e] -outline-offset-4 shadow-[inset_0_0_24px_rgba(34,197,94,0.35)]'
@@ -803,7 +807,10 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
         : 'Turn to your side, arms relaxed by your body.';
 
     return (
-      <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between max-w-lg mx-auto overflow-hidden select-none font-sans">
+      <div
+        ref={cameraContainerRef}
+        className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between max-w-lg mx-auto overflow-hidden select-none font-sans"
+      >
         {isScreenFlashing && (
           <div className="absolute inset-0 z-50 bg-white/90 animate-fade-in pointer-events-none" />
         )}
@@ -821,6 +828,14 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none"
+        />
+
+        {/* Fixed Silhouette Guide */}
+        <PoseGuideOverlay
+          state={currentGuideState}
+          viewMode={activeCameraView}
+          containerRef={cameraContainerRef}
+          videoRef={videoRef}
         />
 
         {notification && (
@@ -879,49 +894,11 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
           {/* Center Vertical Line */}
           <div className={`absolute inset-y-4 left-1/2 -translate-x-1/2 w-[1px] pointer-events-none transition-colors duration-300 ${isPoseValid ? 'bg-emerald-400/70' : 'bg-primary/30'}`} />
 
-          {/* Silhouette SVGs */}
-          <div className="relative w-full max-w-xs h-[480px] flex items-center justify-center">
-            {activeCameraView === 'front' ? (
-              <svg
-                viewBox="0 0 340 560"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className={`w-full h-full max-h-[490px] select-none pointer-events-none drop-shadow-md transition-colors duration-300 ${
-                  isPoseValid ? 'text-emerald-400' : 'text-primary'
-                }`}
-              >
-                <line x1="170" y1="30" x2="170" y2="530" stroke="currentColor" strokeWidth="1.2" strokeDasharray="4 4" className="opacity-40" />
-                <path d="M170 54 C153 54 143 68 143 88 C143 108 153 124 170 124 C187 124 197 108 197 88 C197 68 187 54 170 54 Z" stroke="currentColor" strokeWidth="1.8" strokeDasharray="5 4" className="opacity-85" />
-                <path
-                  d="M158 123 C157 132 153 138 144 142 C132 147 114 156 104 175 C95 192 84 225 78 260 C72 292 68 335 72 360 C73 365 77 368 81 364 C84 360 87 348 90 330 C95 295 106 255 114 225 C118 208 122 195 125 188 C127 205 129 235 131 270 C133 300 131 328 126 355 C120 388 114 430 110 475 C108 495 107 518 106 525 C109 527 121 528 127 525 C129 515 133 480 138 438 C143 395 148 355 152 320 C156 288 163 260 170 252 C177 260 184 288 188 320 C192 355 197 395 202 438 C207 480 211 515 213 525 C219 528 231 527 234 525 C233 518 232 495 230 475 C226 430 220 388 214 355 C209 328 207 300 209 270 C211 235 213 205 215 188 C218 195 222 208 226 225 C234 255 245 295 250 330 C253 348 256 360 259 364 C263 368 267 365 268 360 C272 335 268 292 262 260 C256 225 245 192 236 175 C226 156 208 147 196 142 C187 138 183 132 182 123"
-                  stroke="currentColor" strokeWidth="1.8" strokeDasharray="5 4" strokeLinecap="round" strokeLinejoin="round" className="opacity-85"
-                />
-              </svg>
-            ) : (
-              <svg
-                viewBox="0 0 340 560"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className={`w-full h-full max-h-[490px] select-none pointer-events-none drop-shadow-md transition-colors duration-300 ${
-                  isPoseValid ? 'text-emerald-400' : 'text-primary'
-                }`}
-              >
-                <line x1="170" y1="30" x2="170" y2="530" stroke="currentColor" strokeWidth="1.2" strokeDasharray="4 4" className="opacity-40" />
-                <path d="M172 54 C158 54 148 66 146 82 C145 92 140 98 135 102 C140 106 148 108 152 118 C155 125 162 126 170 126 C182 126 192 114 192 90 C192 68 184 54 172 54 Z" stroke="currentColor" strokeWidth="1.8" strokeDasharray="5 4" className="opacity-85" />
-                <path
-                  d="M152 126 C142 142 136 170 138 205 C140 230 148 250 150 270 C152 295 148 330 144 370 C140 410 138 450 136 490 C135 515 130 525 138 526 C150 528 165 528 172 525 C175 510 176 480 178 440 C180 400 184 360 188 320 C192 280 196 240 194 200 C192 170 185 145 174 130 C170 125 168 126 166 126"
-                  stroke="currentColor" strokeWidth="1.8" strokeDasharray="5 4" strokeLinecap="round" strokeLinejoin="round" className="opacity-85"
-                />
-                <path
-                  d="M164 165 C160 190 158 230 156 270 C154 300 152 335 154 355 C156 360 160 360 162 355 C165 335 168 300 170 270 C172 230 174 190 172 165"
-                  stroke="currentColor" strokeWidth="1.8" strokeDasharray="5 4" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"
-                />
-              </svg>
-            )}
-
+          {/* Countdown & Spinner Overlays */}
+          <div className="relative w-full max-w-xs h-[480px] flex items-center justify-center pointer-events-none">
             {/* Countdown Overlay */}
             {countdown !== null && (
-              <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/50 backdrop-blur-xs rounded-3xl animate-fade-in">
+              <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/50 backdrop-blur-xs rounded-3xl animate-fade-in pointer-events-auto">
                 <span className="text-8xl font-black text-primary font-display animate-ping select-none">
                   {countdown}
                 </span>
@@ -930,7 +907,7 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
 
             {/* Capturing Spinner */}
             {isCapturing && (
-              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-background/60 backdrop-blur-xs rounded-3xl animate-fade-in">
+              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-background/60 backdrop-blur-xs rounded-3xl animate-fade-in pointer-events-auto">
                 <RefreshCw className="w-10 h-10 text-primary animate-spin mb-2" />
                 <span className="text-xs font-semibold text-foreground">Capturing photo...</span>
               </div>

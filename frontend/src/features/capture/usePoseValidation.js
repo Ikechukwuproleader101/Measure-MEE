@@ -1,23 +1,32 @@
 import { useState, useEffect, useRef } from "react";
-import { DrawingUtils, PoseLandmarker } from "@mediapipe/tasks-vision";
 import { getPoseLandmarker } from "../../services/poseLandmarker.js";
 import { THRESHOLDS as T, COLORS } from "./poseConstants.js";
 import { validateAPose } from "./validateAPose.js";
+import { drawSkeletonOverlay } from "./poseGuide.js";
 
 /**
- * Hook for live A-pose validation, stability smoothing, and canvas skeleton overlay.
+ * Hook for live A-pose validation, stability smoothing, and optional canvas skeleton overlay.
  *
  * @param {Object} params
  * @param {React.RefObject<HTMLVideoElement | null>} params.videoRef
  * @param {React.RefObject<HTMLCanvasElement | null>} params.canvasRef
  * @param {boolean} [params.enabled=true]
- * @returns {{ isValid: boolean, hint: string, isReady: boolean, error: string | null }}
+ * @param {Function} [params.validator=validateAPose]
+ * @param {boolean} [params.showSkeleton=false]
+ * @returns {{ isValid: boolean, hint: string, isReady: boolean, error: string | null, personVisible: boolean }}
  */
-export function usePoseValidation({ videoRef, canvasRef, enabled = true, validator = validateAPose }) {
+export function usePoseValidation({
+  videoRef,
+  canvasRef,
+  enabled = true,
+  validator = validateAPose,
+  showSkeleton = false,
+}) {
   const [isValid, setIsValid] = useState(false);
   const [hint, setHint] = useState("Getting ready...");
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState(null);
+  const [personVisible, setPersonVisible] = useState(false);
 
   const validatorRef = useRef(validator);
   useEffect(() => {
@@ -32,6 +41,7 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true, validat
   const consecutiveInvalidRef = useRef(0);
   const currentValidRef = useRef(false);
   const currentHintRef = useRef("Getting ready...");
+  const personVisibleRef = useRef(false);
   const lastDetectionTimeRef = useRef(0);
   const lastVideoTimeRef = useRef(-1);
 
@@ -46,6 +56,13 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true, validat
     if (currentHintRef.current !== nextHint) {
       currentHintRef.current = nextHint;
       setHint(nextHint);
+    }
+  };
+
+  const updatePersonVisibleState = (nextVisible) => {
+    if (personVisibleRef.current !== nextVisible) {
+      personVisibleRef.current = nextVisible;
+      setPersonVisible(nextVisible);
     }
   };
 
@@ -78,7 +95,7 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true, validat
     };
   }, [enabled]);
 
-  // 2. Main detection & drawing loop
+  // 2. Main detection & optional drawing loop
   useEffect(() => {
     if (!enabled || !isReady) {
       if (animFrameIdRef.current) {
@@ -124,7 +141,7 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true, validat
           const result = landmarker.detectForVideo(video, now);
           const landmarks = result?.landmarks?.[0] || null;
 
-          if (canvas) {
+          if (showSkeleton && canvas) {
             if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
               canvas.width = video.videoWidth;
               canvas.height = video.videoHeight;
@@ -133,7 +150,10 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true, validat
 
           if (!landmarks || landmarks.length === 0) {
             // No person in frame
-            clearCanvas();
+            updatePersonVisibleState(false);
+            if (showSkeleton) {
+              clearCanvas();
+            }
             consecutiveInvalidRef.current += 1;
             consecutiveValidRef.current = 0;
 
@@ -143,6 +163,7 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true, validat
             updateHintState("Step into the camera view");
           } else {
             // Person detected: run validator
+            updatePersonVisibleState(true);
             const currentValidator = validatorRef.current || validateAPose;
             const validation = currentValidator(landmarks, {
               width: video.videoWidth,
@@ -170,23 +191,13 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true, validat
               updateHintState(reason);
             }
 
-            // Draw skeleton overlay
-            if (canvas) {
-              const ctx = canvas.getContext("2d");
-              if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                const color = currentValidRef.current ? COLORS.valid : COLORS.invalid;
-                const drawingUtils = new DrawingUtils(ctx);
-                drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
-                  color,
-                  lineWidth: 4,
-                });
-                drawingUtils.drawLandmarks(landmarks, {
-                  color,
-                  fillColor: color,
-                  radius: 4,
-                });
-              }
+            // Draw skeleton overlay only if enabled by debug switch
+            if (showSkeleton && canvas) {
+              const color = currentValidRef.current ? COLORS.valid : COLORS.invalid;
+              drawSkeletonOverlay(canvas, landmarks, {
+                color,
+                showSkeleton: true,
+              });
             }
           }
         } catch (loopErr) {
@@ -205,11 +216,14 @@ export function usePoseValidation({ videoRef, canvasRef, enabled = true, validat
         cancelAnimationFrame(animFrameIdRef.current);
         animFrameIdRef.current = null;
       }
-      clearCanvas();
+      if (showSkeleton) {
+        clearCanvas();
+      }
+      updatePersonVisibleState(false);
     };
-  }, [enabled, isReady, videoRef, canvasRef]);
+  }, [enabled, isReady, videoRef, canvasRef, showSkeleton]);
 
-  return { isValid, hint, isReady, error };
+  return { isValid, hint, isReady, error, personVisible };
 }
 
 export default usePoseValidation;
