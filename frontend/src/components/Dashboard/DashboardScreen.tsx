@@ -28,6 +28,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onSignOut,
   userName = "Ada"
 }) => {
+  const firstName = userName.trim().split(/\s+/)[0] || userName;
+
   return (
     <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between max-w-lg mx-auto pb-24 font-sans select-none">
       {/* Top Header - Clean, Flat, No Harsh Borders */}
@@ -78,7 +80,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         {/* Welcome Greeting */}
         <div className="pt-1">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-display flex items-center gap-2">
-            Hello, {userName} <span className="animate-pulse">👋</span>
+            Hello, {firstName} <span className="animate-pulse">👋</span>
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 font-medium">
             Good to see you! Ready for your next bespoke fitting.
