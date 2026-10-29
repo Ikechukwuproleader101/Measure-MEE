@@ -127,14 +127,14 @@ export const DashboardBanner: React.FC<DashboardBannerProps> = ({ onStartMeasure
         {slides.map((slide, index) => (
           <div
             key={slide.id}
-            className="w-full min-w-full h-full relative px-6 pt-6 sm:px-7 sm:pt-7 pb-20 sm:pb-22 flex items-start justify-between"
+            className="w-full min-w-full h-full relative px-6 sm:px-7 pb-[84px] sm:pb-[96px] flex flex-col justify-end"
             role="group"
             aria-roledescription="slide"
             aria-label={`${index + 1} of ${slides.length}`}
             aria-hidden={currentIndex !== index}
           >
             {/* Headline Block (Line 1 black, Line 2 large white bold) */}
-            <div className="relative z-10 max-w-[58%] sm:max-w-[55%] flex flex-col justify-start">
+            <div className="relative z-10 max-w-[58%] sm:max-w-[55%] flex flex-col justify-end">
               <p className="font-bold text-black text-base sm:text-lg md:text-xl lg:text-2xl leading-tight tracking-tight">
                 {slide.lineOneFormatted}
               </p>
