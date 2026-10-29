@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { Mascot } from '../common/Mascot';
 
 interface SplashScreenProps {
   onContinue?: () => void;
@@ -22,7 +21,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   return (
     <div 
       onClick={onContinue}
-      className="relative w-full h-full min-h-screen bg-primary text-primary-foreground flex flex-col items-center justify-center p-6 select-none cursor-pointer overflow-hidden transition-colors"
+      className="fixed inset-0 z-50 w-screen h-[100dvh] min-h-[100dvh] flex items-center justify-center select-none cursor-pointer overflow-hidden m-0 p-0"
+      style={{
+        backgroundColor: '#CBA6F7',
+        backgroundImage: `linear-gradient(rgba(203, 166, 247, 0.82), rgba(203, 166, 247, 0.82)), url('/images/splash-pattern.png')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -31,31 +37,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         }
       }}
     >
-      {/* Main Mascot Emblem */}
-      <div className="flex flex-col items-center justify-center gap-4 my-auto">
-        <div className="p-4 rounded-3xl transition-transform duration-300 hover:scale-105">
-          <Mascot 
-            color="white" 
-            className="w-32 h-32 md:w-40 md:h-40 drop-shadow-sm" 
-          />
-        </div>
-
-        {/* Wordmark branding */}
-        <div className="text-center mt-2">
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-primary-foreground font-display">
-            Measure <span className="opacity-90">Me</span>
-          </h1>
-          <p className="text-primary-foreground/80 text-sm md:text-base font-medium tracking-wide mt-1.5">
-            Tailored Fit, Anywhere
-          </p>
-        </div>
-      </div>
-
-      {/* Bottom Hint */}
-      <div className="absolute bottom-10 flex flex-col items-center gap-2 text-primary-foreground/70 text-xs">
-        <div className="w-10 h-1 bg-primary-foreground/30 rounded-full" />
-        <span>Tap anywhere to continue</span>
-      </div>
+      {/* Centered Wordmark */}
+      <h1 
+        className="text-white font-extrabold font-display tracking-tight text-center select-none"
+        style={{
+          fontSize: 'clamp(2rem, 5.5vw, 2.75rem)',
+          transform: 'translateY(-1.5%)',
+        }}
+      >
+        Measure Me
+      </h1>
     </div>
   );
 };
