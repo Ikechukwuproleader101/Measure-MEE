@@ -1,19 +1,15 @@
 import React from 'react';
 import { Mascot } from '../common/Mascot';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { 
-  Camera, 
   ChevronRight, 
   Home, 
   FolderKanban, 
   User, 
   Share2, 
-  Sparkles,
-  ArrowRight,
   Clock,
   LogOut
 } from 'lucide-react';
+import { DashboardBanner } from './DashboardBanner';
 
 interface DashboardScreenProps {
   onStartMeasurement: () => void;
@@ -89,46 +85,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </p>
         </div>
 
-        {/* Hero Card: Flat Solid Color (No Gradients, No Harsh Borders) */}
-        <div className="relative rounded-3xl bg-primary p-6 text-primary-foreground overflow-hidden shadow-md shadow-primary/20 group">
-          {/* Background Illustration */}
-          <div className="absolute right-0 bottom-0 top-0 w-44 pointer-events-none flex items-center justify-end pr-2 opacity-95">
-            <img
-              src="/images/illustrations/man-standing.png"
-              alt="Scan Model"
-              className="h-44 object-contain drop-shadow-md transform transition-transform group-hover:scale-105"
-            />
-          </div>
-
-          <div className="relative z-10 max-w-[62%]">
-            <Badge 
-              variant="secondary" 
-              className="bg-black/20 text-white border-0 font-bold mb-2.5 rounded-full px-3 py-1 inline-flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3 h-3" />
-              Camera Capture
-            </Badge>
-
-            <h2 className="text-xl sm:text-2xl font-black leading-tight font-display tracking-tight text-white">
-              Start a new measurement
-            </h2>
-
-            <p className="text-xs text-white/90 font-medium mt-1.5 leading-relaxed">
-              Capture your 3D contours in under 15 seconds.
-            </p>
-
-            <Button
-              onClick={onStartMeasurement}
-              variant="secondary"
-              size="sm"
-              className="mt-5 h-11 bg-card hover:bg-card/90 text-card-foreground rounded-full text-xs font-bold px-5 py-2.5 flex items-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95 border-0"
-            >
-              <Camera className="w-4 h-4 text-primary" />
-              <span>Launch Scan</span>
-              <ArrowRight className="w-3.5 h-3.5 opacity-60 ml-0.5" />
-            </Button>
-          </div>
-        </div>
+        {/* Rotating Carousel Banner */}
+        <DashboardBanner onStartMeasurement={onStartMeasurement} />
 
         {/* Infrastructure Stat Cards - Flat, Elevated, No Borders, Fixed-Size Badges */}
         <div className="grid grid-cols-2 gap-3.5">
