@@ -1,3 +1,4 @@
+// not used by the live camera
 import { IDX, THRESHOLDS as T } from "./poseConstants.js";
 
 const REQUIRED = [

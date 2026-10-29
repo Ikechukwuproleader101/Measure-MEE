@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-  GUIDE_HEAD,
+  GUIDE_HEAD_PATH,
   GUIDE_BODY_PATH,
+  GUIDE_CENTER_LINE,
   placeGuide,
 } from './poseGuide';
+import { COLORS } from './poseConstants';
 import type { GuideStateType } from './guideState';
 
 export interface PoseGuideOverlayProps {
@@ -24,7 +26,7 @@ export const PoseGuideOverlay: React.FC<PoseGuideOverlayProps> = ({
   const [boxDimensions, setBoxDimensions] = useState<{ w: number; h: number }>({ w: 390, h: 844 });
   const [videoDimensions, setVideoDimensions] = useState<{ w: number; h: number }>({ w: 720, h: 1280 });
 
-  // 1. Observe container box dimensions with ResizeObserver and window events
+  // Observe container box dimensions
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -63,7 +65,7 @@ export const PoseGuideOverlay: React.FC<PoseGuideOverlayProps> = ({
     };
   }, [containerRef]);
 
-  // 2. Track video native pixel dimensions from videoRef
+  // Track video native pixel dimensions
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -75,7 +77,6 @@ export const PoseGuideOverlay: React.FC<PoseGuideOverlayProps> = ({
     };
 
     updateVideoSize();
-
     video.addEventListener('loadedmetadata', updateVideoSize);
     video.addEventListener('resize', updateVideoSize);
 
@@ -85,7 +86,7 @@ export const PoseGuideOverlay: React.FC<PoseGuideOverlayProps> = ({
     };
   }, [videoRef]);
 
-  // For side photo view, show no A-pose guide for now (per Step 6.4)
+  // No guide for side view yet
   if (viewMode !== 'front') {
     return null;
   }
@@ -95,30 +96,18 @@ export const PoseGuideOverlay: React.FC<PoseGuideOverlayProps> = ({
   const videoW = videoDimensions.w;
   const videoH = videoDimensions.h;
 
-  const { tx, ty, k } = placeGuide({
-    videoW,
-    videoH,
-    boxW,
-    boxH,
-    fit,
-  });
+  const { tx, ty, k } = placeGuide({ videoW, videoH, boxW, boxH, fit });
 
-  // Color styles corresponding to guideState:
-  // idle: white dashed (10% fill)
-  // invalid: red dashed (10% fill)
-  // valid: green solid (15% fill)
-  let strokeColor = '#ffffff';
-  let fillColor = 'rgba(255, 255, 255, 0.10)';
-  let strokeDasharray = '6 5';
+  // Colors: idle=white dashed, invalid=red dashed, valid=green solid
+  let strokeColor = COLORS.none;
+  let strokeDasharray = '5 4';
 
   if (state === 'valid') {
-    strokeColor = '#22c55e';
-    fillColor = 'rgba(34, 197, 94, 0.15)';
+    strokeColor = COLORS.valid;
     strokeDasharray = 'none';
   } else if (state === 'invalid') {
-    strokeColor = '#ef4444';
-    fillColor = 'rgba(239, 68, 68, 0.10)';
-    strokeDasharray = '6 5';
+    strokeColor = COLORS.invalid;
+    strokeDasharray = '5 4';
   }
 
   return (
@@ -137,27 +126,40 @@ export const PoseGuideOverlay: React.FC<PoseGuideOverlayProps> = ({
         `}</style>
       </defs>
       <g transform={`translate(${tx}, ${ty}) scale(${k})`}>
-        {/* Head circle */}
-        <circle
-          cx={GUIDE_HEAD.cx}
-          cy={GUIDE_HEAD.cy}
-          r={GUIDE_HEAD.r}
-          fill={fillColor}
+        {/* Center line */}
+        <line
+          x1={GUIDE_CENTER_LINE.x1}
+          y1={GUIDE_CENTER_LINE.y1}
+          x2={GUIDE_CENTER_LINE.x2}
+          y2={GUIDE_CENTER_LINE.y2}
           stroke={strokeColor}
-          strokeWidth={1.8}
-          strokeDasharray={strokeDasharray}
+          strokeWidth={1.2}
+          strokeDasharray="4 4"
+          opacity={0.4}
           style={{ vectorEffect: 'non-scaling-stroke' }}
           className="pose-guide-element"
         />
-        {/* Body path */}
+        {/* Head */}
+        <path
+          d={GUIDE_HEAD_PATH}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={1.8}
+          strokeDasharray={strokeDasharray}
+          opacity={0.85}
+          style={{ vectorEffect: 'non-scaling-stroke' }}
+          className="pose-guide-element"
+        />
+        {/* Body */}
         <path
           d={GUIDE_BODY_PATH}
-          fill={fillColor}
+          fill="none"
           stroke={strokeColor}
           strokeWidth={1.8}
           strokeDasharray={strokeDasharray}
           strokeLinecap="round"
           strokeLinejoin="round"
+          opacity={0.85}
           style={{ vectorEffect: 'non-scaling-stroke' }}
           className="pose-guide-element"
         />

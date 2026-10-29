@@ -20,10 +20,11 @@ import {
 import { usePoseValidation } from '../../features/capture/usePoseValidation';
 import { validateAPose } from '../../features/capture/validateAPose';
 import { validateSidePose } from '../../features/capture/validateSidePose';
-import { COUNTDOWN_SECONDS } from '../../features/capture/poseConstants';
+import { FIT_CONFIG, GUIDE, AUTO_START_WHEN_GREEN } from '../../features/capture/poseConstants';
 import { guideState } from '../../features/capture/guideState';
-import { parsePoseDebug } from '../../features/capture/poseGuide';
+import { parsePoseDebug, placeGuide } from '../../features/capture/poseGuide';
 import { PoseGuideOverlay } from '../../features/capture/PoseGuideOverlay';
+import { shouldCaptureAtZero, fitToGuide, boxToArtwork } from '../../features/capture/fitToGuide';
 import { captureFrame, processUploadedImage } from '../../features/capture/captureFrame';
 import {
   captureReducer,
@@ -83,6 +84,12 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
   const activeValidator = activeCameraView === 'front' ? validateAPose : validateSidePose;
   const isDebugPose = typeof window !== 'undefined' ? parsePoseDebug(window.location) : false;
 
+  // Debug calibration mode: record pose state
+  const [isRecordingPose, setIsRecordingPose] = useState(false);
+  const [recordedFrames, setRecordedFrames] = useState<any[]>([]);
+  const [recordedPoseJson, setRecordedPoseJson] = useState<string | null>(null);
+  const [copiedJson, setCopiedJson] = useState(false);
+
   // Real-time on-device MediaPipe Pose detection (only active during camera step)
   const {
     isValid: isPoseValid,
@@ -90,12 +97,17 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
     isReady: isPoseReady,
     error: poseError,
     personVisible,
+    lastValidAtMs,
+    fitResult,
   } = usePoseValidation({
     videoRef,
     canvasRef,
+    containerRef: cameraContainerRef,
     enabled: isCameraActive && hasCameraStream && !isCapturing,
     validator: activeValidator,
     showSkeleton: isDebugPose,
+    viewMode: activeCameraView,
+    mirrored: facingMode === 'user',
   });
 
   const showNotification = (msg: string) => {
@@ -186,6 +198,102 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
     };
   }, [session.front?.previewUrl, session.side?.previewUrl]);
 
+  // Finish recording calibration pose and construct artwork JSON
+  const finishRecordingPose = useCallback(
+    (frames: any[]) => {
+      if (!frames.length) return;
+      const jointNames = [
+        'nose',
+        'leftShoulder',
+        'rightShoulder',
+        'leftElbow',
+        'rightElbow',
+        'leftWrist',
+        'rightWrist',
+        'leftHip',
+        'rightHip',
+        'leftKnee',
+        'rightKnee',
+        'leftAnkle',
+        'rightAnkle',
+      ];
+      const isMirrored = facingMode === 'user';
+
+      const artworkJointPoints: Record<string, { x: number; y: number }[]> = {};
+      for (const name of jointNames) {
+        artworkJointPoints[name] = [];
+      }
+
+      for (const f of frames) {
+        for (const name of jointNames) {
+          if (f.joints[name]) {
+            const artPt = boxToArtwork(f.joints[name], f.placement, isMirrored);
+            artworkJointPoints[name].push(artPt);
+          }
+        }
+      }
+
+      const output: Record<string, { x: number; y: number; r: number; jitter: number }> = {};
+      for (const name of jointNames) {
+        const pts = artworkJointPoints[name];
+        if (pts.length > 0) {
+          const meanX = pts.reduce((acc, p) => acc + p.x, 0) / pts.length;
+          const meanY = pts.reduce((acc, p) => acc + p.y, 0) / pts.length;
+          const variance =
+            pts.reduce((acc, p) => acc + Math.pow(p.x - meanX, 2) + Math.pow(p.y - meanY, 2), 0) / pts.length;
+          const jitter = Math.round(Math.sqrt(variance) * 10) / 10;
+          const defaultR = (GUIDE.radii as Record<string, number> | undefined)?.[name] || 24;
+          output[name] = {
+            x: Math.round(meanX * 10) / 10,
+            y: Math.round(meanY * 10) / 10,
+            r: defaultR,
+            jitter,
+          };
+        }
+      }
+
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG POSE] Recorded Pose Calibration:', output);
+      setRecordedPoseJson(JSON.stringify({ joints: output }, null, 2));
+    },
+    [facingMode]
+  );
+
+  // Frame collector for Record Pose calibration mode (30 frames)
+  useEffect(() => {
+    if (!isRecordingPose || !fitResult?.joints?.length) return;
+    const container = cameraContainerRef.current;
+    const video = videoRef.current;
+    if (!container || !video) return;
+
+    const boxW = container.clientWidth;
+    const boxH = container.clientHeight;
+    const { k, tx, ty } = placeGuide({
+      videoW: video.videoWidth || 720,
+      videoH: video.videoHeight || 1280,
+      boxW,
+      boxH,
+      fit: 'cover',
+      guide: GUIDE,
+    });
+
+    const frameJoints: Record<string, { x: number; y: number }> = {};
+    for (const j of fitResult.joints) {
+      if (j.x !== undefined && j.y !== undefined && j.dist !== Infinity) {
+        frameJoints[j.name] = { x: j.x, y: j.y };
+      }
+    }
+
+    setRecordedFrames((prev) => {
+      const next = [...prev, { joints: frameJoints, placement: { k, tx, ty } }];
+      if (next.length >= 30) {
+        finishRecordingPose(next);
+        setIsRecordingPose(false);
+      }
+      return next;
+    });
+  }, [isRecordingPose, fitResult, facingMode, finishRecordingPose]);
+
   // Execute frame capture using unmirrored IMAGE mode landmarker
   const executeCapture = useCallback(async () => {
     if (!videoRef.current || isCapturing) return;
@@ -194,10 +302,39 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
     setIsScreenFlashing(true);
     setTimeout(() => setIsScreenFlashing(false), 200);
 
+    const captureValidator =
+      activeCameraView === 'front'
+        ? (rawJoints: any) => {
+            const container = cameraContainerRef.current;
+            const video = videoRef.current;
+            if (!container || !video) return { valid: true, reasons: [] };
+            const boxW = container.clientWidth;
+            const boxH = container.clientHeight;
+            const videoW = video.videoWidth || 720;
+            const videoH = video.videoHeight || 1280;
+            const placement = placeGuide({ videoW, videoH, boxW, boxH, fit: 'cover', guide: GUIDE });
+            const result = fitToGuide({
+              landmarks: rawJoints,
+              placement,
+              videoW,
+              videoH,
+              boxW,
+              boxH,
+              mirrored: facingMode === 'user',
+              radiusScale: FIT_CONFIG.captureRadiusScale,
+              guide: GUIDE,
+            });
+            return {
+              valid: result.pass,
+              reasons: result.hint ? [result.hint] : [],
+            };
+          }
+        : activeValidator;
+
     const result = await captureFrame({
       video: videoRef.current,
       view: activeCameraView,
-      validator: activeValidator,
+      validator: captureValidator,
     });
 
     if ('error' in result) {
@@ -207,26 +344,18 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
       dispatch(setCaptureAction(activeCameraView, result));
       setIsCapturing(false);
     }
-  }, [activeCameraView, activeValidator, isCapturing]);
+  }, [activeCameraView, activeValidator, facingMode, isCapturing]);
 
-  // Hands-free capture countdown (3 -> 2 -> 1 -> capture at 0)
+  // Optional auto-start when green (configured by AUTO_START_WHEN_GREEN)
   useEffect(() => {
-    if (!isCameraActive || isCapturing) {
-      setCountdown(null);
-      return;
-    }
+    if (!isCameraActive || isCapturing || !AUTO_START_WHEN_GREEN) return;
 
-    if (isPoseValid) {
-      if (countdown === null) {
-        setCountdown(COUNTDOWN_SECONDS);
-      }
-    } else {
-      if (countdown !== null) {
-        setCountdown(null);
-      }
+    if (isPoseValid && countdown === null) {
+      setCountdown(FIT_CONFIG.countdownSeconds);
     }
   }, [isCameraActive, isPoseValid, isCapturing, countdown]);
 
+  // Countdown timer (3 -> 2 -> 1 -> check at 0)
   useEffect(() => {
     if (countdown === null) return;
 
@@ -237,13 +366,33 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
       return () => clearTimeout(timer);
     } else if (countdown === 0) {
       setCountdown(null);
+      const canCapture = shouldCaptureAtZero({
+        isValid: isPoseValid,
+        lastValidAtMs,
+        nowMs: performance.now(),
+        graceMs: FIT_CONFIG.captureGraceMs,
+      });
+
+      if (canCapture) {
+        executeCapture();
+      } else {
+        showNotification('Not quite. Match the outline and try again.');
+      }
+    }
+  }, [countdown, executeCapture, isPoseValid, lastValidAtMs]);
+
+  // Capture button: always enabled once camera is active. Pressing during countdown cancels it.
+  const handleManualShutter = () => {
+    if (!hasCameraStream || isCapturing) return;
+    if (countdown !== null) {
+      setCountdown(null);
+      return;
+    }
+    if (FIT_CONFIG.countdownSeconds > 0) {
+      setCountdown(FIT_CONFIG.countdownSeconds);
+    } else {
       executeCapture();
     }
-  }, [countdown, executeCapture]);
-
-  const handleManualShutter = () => {
-    if (!isPoseValid || isCapturing) return;
-    executeCapture();
   };
 
   const handleToggleFlash = () => {
@@ -961,17 +1110,17 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
             <button
               type="button"
               onClick={handleManualShutter}
-              disabled={!isPoseValid || isCapturing}
+              disabled={!hasCameraStream || isCapturing}
               className={`w-20 h-20 rounded-full border-4 p-1.5 flex items-center justify-center active:scale-95 transition-all cursor-pointer group shadow-lg ${
                 isPoseValid
                   ? 'border-emerald-500/80 hover:border-emerald-400 shadow-emerald-500/20'
-                  : 'border-primary/35 opacity-50 cursor-not-allowed shadow-none'
+                  : 'border-primary/40 hover:border-primary/70 shadow-none'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-label="Capture photo"
             >
               <div
                 className={`w-full h-full rounded-full transition-colors shadow-inner flex items-center justify-center ${
-                  isPoseValid ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-primary/50'
+                  isPoseValid ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-primary/50 group-hover:bg-primary/70'
                 }`}
               />
             </button>
@@ -983,6 +1132,94 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
             </div>
           </div>
         </footer>
+        {/* Debug UI (only rendered if isDebugPose is true) */}
+        {isDebugPose && (
+          <>
+            <div className="absolute top-16 right-4 z-40 max-w-[220px] bg-black/80 backdrop-blur-md text-[10px] text-white p-3 rounded-xl border border-white/20 font-mono shadow-xl space-y-1 select-text pointer-events-auto">
+              <div className="font-bold text-xs text-primary mb-1 flex items-center justify-between">
+                <span>POSE DEBUG</span>
+                <span className={isPoseValid ? 'text-emerald-400' : 'text-amber-400'}>
+                  {isPoseValid ? 'PASS' : 'FAIL'}
+                </span>
+              </div>
+              <div>Video: {videoRef.current ? `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}` : 'N/A'}</div>
+              <div>Box: {cameraContainerRef.current ? `${cameraContainerRef.current.clientWidth}x${cameraContainerRef.current.clientHeight}` : 'N/A'}</div>
+              {fitResult && (
+                <>
+                  <div>Ratio: {fitResult.ratio ?? 'N/A'} (target ~1.0)</div>
+                  <div>Center: dx={fitResult.dx ?? 0}px, dy={fitResult.dy ?? 0}px</div>
+                  <div>
+                    State: {fitResult.pass ? 'PASS' : 'FAIL'} {fitResult.scalePass ? '✓scale' : '✗scale'} {fitResult.centerPass ? '✓cntr' : '✗cntr'}
+                  </div>
+                  {fitResult.worstJoint && (
+                    <div>
+                      Worst: {fitResult.worstJoint.name} ({Math.round(fitResult.worstJoint.dist)}px / {Math.round(fitResult.worstJoint.maxDist)}px)
+                    </div>
+                  )}
+                  {fitResult.missedJoints && fitResult.missedJoints.length > 0 && (
+                    <div className="text-red-300">
+                      Missed: {fitResult.missedJoints.join(', ')}
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecordedFrames([]);
+                    setIsRecordingPose(true);
+                  }}
+                  disabled={isRecordingPose}
+                  className="w-full py-1 px-2 rounded bg-primary/80 hover:bg-primary text-white text-[10px] font-semibold tracking-wide disabled:opacity-50 cursor-pointer"
+                >
+                  {isRecordingPose ? `Recording (${recordedFrames.length}/30)...` : 'Record Pose (30f)'}
+                </button>
+              </div>
+            </div>
+
+            {/* Recorded Pose Modal */}
+            {recordedPoseJson && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+                <div className="w-full max-w-sm max-h-[80vh] flex flex-col bg-card border border-border rounded-2xl p-4 shadow-2xl text-foreground">
+                  <div className="flex items-center justify-between pb-2 border-b border-border">
+                    <h3 className="font-bold text-sm">Recorded Pose (Artwork Coords)</h3>
+                    <button
+                      type="button"
+                      onClick={() => setRecordedPoseJson(null)}
+                      className="text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <pre className="flex-1 my-3 p-2 bg-secondary/50 rounded-lg text-[10px] font-mono overflow-auto select-all text-foreground">
+                    {recordedPoseJson}
+                  </pre>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(recordedPoseJson);
+                        setCopiedJson(true);
+                        setTimeout(() => setCopiedJson(false), 2000);
+                      }}
+                      className="flex-1 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold cursor-pointer"
+                    >
+                      {copiedJson ? 'Copied!' : 'Copy JSON'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecordedPoseJson(null)}
+                      className="px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-xs cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   }

@@ -1,49 +1,73 @@
 import { useState, useEffect, useRef } from "react";
 import { getPoseLandmarker } from "../../services/poseLandmarker.js";
-import { THRESHOLDS as T, COLORS } from "./poseConstants.js";
-import { validateAPose } from "./validateAPose.js";
-import { drawSkeletonOverlay } from "./poseGuide.js";
+import { THRESHOLDS as T, COLORS, GUIDE, FIT_CONFIG, IDX } from "./poseConstants.js";
+import { placeGuide, drawSkeletonOverlay } from "./poseGuide.js";
+import { fitToGuide, createHoldTracker, smoothJoints } from "./fitToGuide.js";
+
+const JOINT_NAMES = [
+  "nose",
+  "leftShoulder", "rightShoulder",
+  "leftElbow", "rightElbow",
+  "leftWrist", "rightWrist",
+  "leftHip", "rightHip",
+  "leftKnee", "rightKnee",
+  "leftAnkle", "rightAnkle",
+];
 
 /**
- * Hook for live A-pose validation, stability smoothing, and optional canvas skeleton overlay.
+ * Hook for live pose validation using the fit-to-guide rule.
  *
- * @param {Object} params
- * @param {React.RefObject<HTMLVideoElement | null>} params.videoRef
- * @param {React.RefObject<HTMLCanvasElement | null>} params.canvasRef
- * @param {boolean} [params.enabled=true]
- * @param {Function} [params.validator=validateAPose]
- * @param {boolean} [params.showSkeleton=false]
- * @returns {{ isValid: boolean, hint: string, isReady: boolean, error: string | null, personVisible: boolean }}
+ * Runs MediaPipe on every frame, maps landmarks to screen space,
+ * compares against the silhouette guide's joint targets, and exposes
+ * { isValid, hint, isReady, error, personVisible, lastValidAtMs, fitResult }.
+ *
+ * The old validator prop is kept for the side view (which still uses validateSidePose).
+ * For the front view, fitToGuide is used instead.
  */
 export function usePoseValidation({
   videoRef,
   canvasRef,
+  containerRef,
   enabled = true,
-  validator = validateAPose,
+  validator,
   showSkeleton = false,
+  viewMode = "front",
 }) {
   const [isValid, setIsValid] = useState(false);
   const [hint, setHint] = useState("Getting ready...");
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState(null);
   const [personVisible, setPersonVisible] = useState(false);
+  const [lastValidAtMs, setLastValidAtMs] = useState(0);
+  const [fitResult, setFitResult] = useState(null);
 
   const validatorRef = useRef(validator);
   useEffect(() => {
     validatorRef.current = validator;
-    consecutiveValidRef.current = 0;
-    consecutiveInvalidRef.current = 0;
   }, [validator]);
 
   const landmarkerRef = useRef(null);
   const animFrameIdRef = useRef(null);
-  const consecutiveValidRef = useRef(0);
-  const consecutiveInvalidRef = useRef(0);
   const currentValidRef = useRef(false);
   const currentHintRef = useRef("Getting ready...");
   const personVisibleRef = useRef(false);
   const lastDetectionTimeRef = useRef(0);
   const lastVideoTimeRef = useRef(-1);
+  const smoothedJointsRef = useRef(null);
+  const holdTrackerRef = useRef(createHoldTracker({
+    passHoldMs: FIT_CONFIG.passHoldMs,
+    failHoldMs: FIT_CONFIG.failHoldMs,
+  }));
+
+  // Reset hold tracker when viewMode changes
+  useEffect(() => {
+    holdTrackerRef.current.reset();
+    smoothedJointsRef.current = null;
+    setIsValid(false);
+    currentValidRef.current = false;
+    setPersonVisible(false);
+    personVisibleRef.current = false;
+  }, [viewMode]);
 
   const updateValidState = (nextValid) => {
     if (currentValidRef.current !== nextValid) {
@@ -66,10 +90,9 @@ export function usePoseValidation({
     }
   };
 
-  // 1. Initialize PoseLandmarker once enabled
+  // 1. Initialize PoseLandmarker
   useEffect(() => {
     if (!enabled) return;
-
     let cancelled = false;
 
     async function init() {
@@ -89,13 +112,10 @@ export function usePoseValidation({
     }
 
     init();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [enabled]);
 
-  // 2. Main detection & optional drawing loop
+  // 2. Main detection loop
   useEffect(() => {
     if (!enabled || !isReady) {
       if (animFrameIdRef.current) {
@@ -112,9 +132,7 @@ export function usePoseValidation({
       const canvas = canvasRef?.current;
       if (canvas) {
         const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
     };
 
@@ -124,7 +142,6 @@ export function usePoseValidation({
       const video = videoRef?.current;
       const landmarker = landmarkerRef.current;
       const canvas = canvasRef?.current;
-
       const now = performance.now();
 
       if (
@@ -149,55 +166,122 @@ export function usePoseValidation({
           }
 
           if (!landmarks || landmarks.length === 0) {
-            // No person in frame
+            // No person
             updatePersonVisibleState(false);
-            if (showSkeleton) {
-              clearCanvas();
-            }
-            consecutiveInvalidRef.current += 1;
-            consecutiveValidRef.current = 0;
-
-            if (consecutiveInvalidRef.current >= T.failFramesToDrop) {
-              updateValidState(false);
-            }
+            if (showSkeleton) clearCanvas();
+            const holderValid = holdTrackerRef.current.update(false, now);
+            updateValidState(holderValid);
             updateHintState("Step into the camera view");
+            smoothedJointsRef.current = null;
           } else {
-            // Person detected: run validator
             updatePersonVisibleState(true);
-            const currentValidator = validatorRef.current || validateAPose;
-            const validation = currentValidator(landmarks, {
-              width: video.videoWidth,
-              height: video.videoHeight,
-            });
 
-            if (validation.valid) {
-              consecutiveValidRef.current += 1;
-              consecutiveInvalidRef.current = 0;
+            if (viewMode === "front") {
+              // Fit-to-guide for front view
+              const container = containerRef?.current;
+              const boxW = container?.clientWidth || video.videoWidth;
+              const boxH = container?.clientHeight || video.videoHeight;
+              const videoW = video.videoWidth;
+              const videoH = video.videoHeight;
 
-              if (consecutiveValidRef.current >= T.stableFramesToPass) {
-                updateValidState(true);
-                updateHintState("Perfect, hold still");
-              } else {
-                updateHintState("Hold still...");
+              if (showSkeleton && canvas) {
+                if (canvas.width !== boxW || canvas.height !== boxH) {
+                  canvas.width = boxW;
+                  canvas.height = boxH;
+                }
+              }
+
+              const placement = placeGuide({ videoW, videoH, boxW, boxH, fit: "cover" });
+
+              // Extract raw joint positions in box pixels for smoothing
+              const cs = placement.cs;
+              const rawJoints = {};
+              for (const name of JOINT_NAMES) {
+                const idx = IDX[name];
+                const lm = landmarks[idx];
+                if (!lm) continue;
+                let bx = boxW / 2 + (lm.x - 0.5) * videoW * cs;
+                const by = boxH / 2 + (lm.y - 0.5) * videoH * cs;
+                rawJoints[name] = { x: bx, y: by, visibility: lm.visibility ?? 0 };
+              }
+
+              // Smooth
+              smoothedJointsRef.current = smoothJoints(
+                smoothedJointsRef.current,
+                rawJoints,
+                FIT_CONFIG.smoothingAlpha
+              );
+
+              // Build smoothed landmarks array for fitToGuide (put smoothed back into normalized)
+              const smoothedLandmarks = [...landmarks];
+              for (const name of JOINT_NAMES) {
+                const idx = IDX[name];
+                const sj = smoothedJointsRef.current[name];
+                if (sj) {
+                  const u = 0.5 + (sj.x - boxW / 2) / (videoW * cs);
+                  const v = 0.5 + (sj.y - boxH / 2) / (videoH * cs);
+                  smoothedLandmarks[idx] = {
+                    ...landmarks[idx],
+                    x: u,
+                    y: v,
+                  };
+                }
+              }
+
+              const fit = fitToGuide({
+                landmarks: smoothedLandmarks,
+                placement,
+                videoW,
+                videoH,
+                boxW,
+                boxH,
+                fit: "cover",
+                mirrored: false,
+                guide: GUIDE,
+              });
+
+              setFitResult(fit);
+
+              const holderValid = holdTrackerRef.current.update(fit.pass, now);
+              updateValidState(holderValid);
+              if (holderValid) {
+                setLastValidAtMs(now);
+              }
+              updateHintState(holderValid ? "Perfect, hold still" : fit.hint);
+
+              // Draw debug skeleton overlay
+              if (showSkeleton && canvas) {
+                const color = currentValidRef.current ? COLORS.valid : COLORS.invalid;
+                drawSkeletonOverlay(canvas, landmarks, { color, showSkeleton: true, fitResult: fit });
               }
             } else {
-              consecutiveInvalidRef.current += 1;
-              consecutiveValidRef.current = 0;
-
-              if (consecutiveInvalidRef.current >= T.failFramesToDrop) {
-                updateValidState(false);
+              // Side view: use the old validator
+              if (showSkeleton && canvas) {
+                if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                  canvas.width = video.videoWidth;
+                  canvas.height = video.videoHeight;
+                }
               }
-              const reason = validation.reasons[0] || "Step into the camera view";
-              updateHintState(reason);
-            }
 
-            // Draw skeleton overlay only if enabled by debug switch
-            if (showSkeleton && canvas) {
-              const color = currentValidRef.current ? COLORS.valid : COLORS.invalid;
-              drawSkeletonOverlay(canvas, landmarks, {
-                color,
-                showSkeleton: true,
-              });
+              const currentValidator = validatorRef.current;
+              if (currentValidator) {
+                const validation = currentValidator(landmarks, {
+                  width: video.videoWidth,
+                  height: video.videoHeight,
+                });
+
+                const holderValid = holdTrackerRef.current.update(validation.valid, now);
+                updateValidState(holderValid);
+                if (holderValid) setLastValidAtMs(now);
+                const reason = validation.reasons?.[0] || "Step into the camera view";
+                updateHintState(holderValid ? "Perfect, hold still" : reason);
+              }
+
+              // Draw skeleton overlay only in debug mode
+              if (showSkeleton && canvas) {
+                const color = currentValidRef.current ? COLORS.valid : COLORS.invalid;
+                drawSkeletonOverlay(canvas, landmarks, { color, showSkeleton: true });
+              }
             }
           }
         } catch (loopErr) {
@@ -216,14 +300,12 @@ export function usePoseValidation({
         cancelAnimationFrame(animFrameIdRef.current);
         animFrameIdRef.current = null;
       }
-      if (showSkeleton) {
-        clearCanvas();
-      }
+      if (showSkeleton) clearCanvas();
       updatePersonVisibleState(false);
     };
-  }, [enabled, isReady, videoRef, canvasRef, showSkeleton]);
+  }, [enabled, isReady, videoRef, canvasRef, containerRef, showSkeleton, viewMode]);
 
-  return { isValid, hint, isReady, error, personVisible };
+  return { isValid, hint, isReady, error, personVisible, lastValidAtMs, fitResult };
 }
 
 export default usePoseValidation;

@@ -29,3 +29,31 @@ export declare function guideState(params?: {
   isValid?: boolean;
 }): 'idle' | 'invalid' | 'valid';
 
+export interface GuideDefinition {
+  viewBox: { w: number; h: number };
+  bounds: { top: number; bottom: number; left: number; right: number };
+  head?: string;
+  body?: string;
+  centerLine?: { x1: number; y1: number; x2: number; y2: number };
+  joints: Record<string, [number, number]>;
+  radii?: Record<string, number>;
+}
+
+export declare const GUIDE: GuideDefinition;
+export declare const GUIDE_BUILTIN: GuideDefinition;
+
+export interface FitConfig {
+  radius: Record<string, number>;
+  coreJoints: string[];
+  allowedMisses: number;
+  minVisibilityCore: number;
+  smoothingAlpha: number;
+  passHoldMs: number;
+  failHoldMs: number;
+  captureRadiusScale: number;
+  captureGraceMs: number;
+  countdownSeconds: number;
+}
+
+export declare const FIT_CONFIG: FitConfig;
+export declare const AUTO_START_WHEN_GREEN: boolean;
