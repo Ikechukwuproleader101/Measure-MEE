@@ -163,7 +163,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
             disabled={isLoading}
             className="w-full h-[56px] mt-2 rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-70"
           >
-            {isLoading ? <PillSpinner /> : 'Create Account'}
+            {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Create Account'}
           </button>
         </form>
       </div>

@@ -257,7 +257,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       {/* VIEW 1: Primary Authentication Entry Screen (Matching Reference Mockup) */}
       {authMode === 'entry' && (
-        <div className="flex-1 flex flex-col justify-between items-center w-full max-w-md mx-auto pt-8 sm:pt-12 pb-0 px-6 animate-fade-in">
+        <div className="flex-1 flex flex-col justify-between items-center w-full max-w-md mx-auto pt-16 sm:pt-24 pb-0 px-6 animate-fade-in">
           {/* Top Header: Measure Me */}
           <header className="w-full text-center">
             <h1 className="text-[32px] sm:text-[36px] font-bold text-white tracking-normal font-sans">
@@ -330,7 +330,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 aria-label="Continue with Google"
               >
                 {isLoading ? (
-                  <PillSpinner />
+                  <PillSpinner className="border-black border-t-transparent" />
                 ) : (
                   <>
                     <svg className="w-5 h-5 fill-current text-[#080808] shrink-0" viewBox="0 0 24 24">
@@ -479,7 +479,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 disabled={isLoading}
                 className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
               >
-                {isLoading ? <PillSpinner /> : 'Sign in'}
+                {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Sign in'}
               </button>
 
               {/* Forgot Password */}
@@ -610,7 +610,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 disabled={isLoading}
                 className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
               >
-                {isLoading ? <PillSpinner /> : 'Create Account'}
+                {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Create Account'}
               </button>
             </form>
           </div>
@@ -687,7 +687,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 disabled={isLoading}
                 className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
               >
-                {isLoading ? <PillSpinner /> : 'Send Reset Link'}
+                {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Send Reset Link'}
               </button>
             </form>
           </div>
