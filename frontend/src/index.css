@@ -181,10 +181,29 @@
   }
   input, textarea, select {
     outline: none !important;
+    border: none;
+    color-scheme: dark;
   }
-  input:focus, textarea:focus, select:focus {
+  input:focus, textarea:focus, select:focus,
+  input:focus-visible, textarea:focus-visible, select:focus-visible,
+  input:focus-within, textarea:focus-within, select:focus-within {
     outline: none !important;
-    box-shadow: none;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  /* WebKit Autofill Dark Mode Override */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover, 
+  input:-webkit-autofill:focus, 
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #18181B inset !important;
+    box-shadow: 0 0 0 1000px #18181B inset !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    caret-color: #FFFFFF !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    outline: none !important;
+    transition: background-color 5000s ease-in-out 0s;
   }
   input::placeholder,
   textarea::placeholder,
@@ -194,9 +213,11 @@
   textarea::-moz-placeholder,
   input:-ms-input-placeholder,
   textarea:-ms-input-placeholder {
-    color: #727088 !important;
-    -webkit-text-fill-color: #727088 !important;
+    color: #71717A !important;
+    -webkit-text-fill-color: #71717A !important;
     opacity: 1 !important;
+    outline: none !important;
+    border: none !important;
   }
   body {
     @apply bg-background text-foreground;

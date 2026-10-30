@@ -141,3 +141,66 @@
   }
 }
 
+/* Authentication Input Form Controls - Dark styling & complete autofill reset */
+.auth-input-container {
+  position: relative;
+  width: 100%;
+  height: 54px;
+  border-radius: 16px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #18181B;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.auth-input-container:focus-within {
+  border-color: #C69AF3;
+}
+
+.auth-input-field {
+  width: 100%;
+  height: 100%;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #FFFFFF !important;
+  font-size: 15px;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+  color-scheme: dark;
+}
+
+.auth-input-field:focus,
+.auth-input-field:active {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.auth-input-field:-webkit-autofill,
+.auth-input-field:-webkit-autofill:hover,
+.auth-input-field:-webkit-autofill:focus,
+.auth-input-field:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #18181B inset !important;
+  box-shadow: 0 0 0 1000px #18181B inset !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+  caret-color: #FFFFFF !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  outline: none !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.auth-input-field::placeholder {
+  color: #71717A !important;
+  -webkit-text-fill-color: #71717A !important;
+  opacity: 1 !important;
+}
+
+

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, Eye, EyeOff, User, Mail, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { PillSpinner } from '../common/PillLoader';
+import './signupMotion.css';
 
 interface CreateAccountScreenProps {
   onBack: () => void;
@@ -92,7 +93,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         {/* Form Inputs */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 w-full">
           {/* Full Name */}
-          <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+          <div className="auth-input-container">
             <User className="w-4 h-4 text-[#C69AF3] shrink-0" />
             <input 
               type="text"
@@ -101,12 +102,12 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Full name (e.g. Ada Lovelace)"
               autoComplete="name"
-              className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+              className="auth-input-field"
             />
           </div>
 
           {/* Email Address */}
-          <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+          <div className="auth-input-container">
             <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
             <input 
               type="email"
@@ -115,12 +116,12 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email address"
               autoComplete="email"
-              className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+              className="auth-input-field"
             />
           </div>
 
           {/* Password */}
-          <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+          <div className="auth-input-container">
             <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
             <input 
               type={showPassword ? 'text' : 'password'}
@@ -129,12 +130,12 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password (min 8 characters)"
               autoComplete="new-password"
-              className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+              className="auth-input-field"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="text-[#71717A] hover:text-white cursor-pointer"
+              className="text-[#71717A] hover:text-white cursor-pointer shrink-0"
               aria-label="Toggle password visibility"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -161,9 +162,9 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-[56px] mt-2 rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-70"
+            className="w-full h-[56px] mt-2 rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[17px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-70"
           >
-            {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Create Account'}
+            {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Sign up'}
           </button>
         </form>
       </div>

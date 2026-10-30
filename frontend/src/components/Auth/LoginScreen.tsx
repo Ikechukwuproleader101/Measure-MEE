@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Mail, ArrowLeft, X, Check, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, ArrowLeft, X, Check, Lock, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import { PillSpinner } from '../common/PillLoader';
@@ -420,7 +420,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
             <form onSubmit={handleEmailSignIn} className="flex flex-col gap-3.5 w-full">
               {/* Email Input */}
-              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+              <div className="auth-input-container">
                 <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   ref={emailInputRef}
@@ -430,13 +430,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   autoComplete="email"
-                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                  className="auth-input-field"
                 />
                 {email.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setEmail('')}
-                    className="w-5 h-5 rounded-full bg-white/10 text-white flex items-center justify-center cursor-pointer"
+                    className="w-5 h-5 rounded-full bg-white/10 text-white flex items-center justify-center cursor-pointer shrink-0"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -444,7 +444,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
 
               {/* Password Input */}
-              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+              <div className="auth-input-container">
                 <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   ref={passwordInputRef}
@@ -454,12 +454,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   autoComplete="current-password"
-                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                  className="auth-input-field"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[#71717A] hover:text-white cursor-pointer"
+                  className="text-[#71717A] hover:text-white cursor-pointer shrink-0"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -477,7 +477,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
+                className="w-full h-[56px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[17px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
               >
                 {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Sign in'}
               </button>
@@ -550,19 +550,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
             <form onSubmit={handleEmailSignUp} className="flex flex-col gap-3.5 w-full">
               {/* Full Name */}
-              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+              <div className="auth-input-container">
+                <User className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Full name (optional)"
                   autoComplete="name"
-                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                  className="auth-input-field"
                 />
               </div>
 
               {/* Email */}
-              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+              <div className="auth-input-container">
                 <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   type="email"
@@ -571,12 +572,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   autoComplete="email"
-                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                  className="auth-input-field"
                 />
               </div>
 
               {/* Password */}
-              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+              <div className="auth-input-container">
                 <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -585,12 +586,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password (min 8 characters)"
                   autoComplete="new-password"
-                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                  className="auth-input-field"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[#71717A] hover:text-white cursor-pointer"
+                  className="text-[#71717A] hover:text-white cursor-pointer shrink-0"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -604,13 +605,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </div>
               )}
 
-              {/* Create Account Button */}
+              {/* Sign Up Button */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
+                className="w-full h-[56px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[17px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
               >
-                {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Create Account'}
+                {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Sign up'}
               </button>
             </form>
           </div>
@@ -662,7 +663,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
 
             <form onSubmit={handleForgotPassword} className="flex flex-col gap-3.5 w-full">
-              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+              <div className="auth-input-container">
                 <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   type="email"
@@ -671,7 +672,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   autoComplete="email"
-                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                  className="auth-input-field"
                 />
               </div>
 
@@ -685,7 +686,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
+                className="w-full h-[56px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[17px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
               >
                 {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Send Reset Link'}
               </button>
