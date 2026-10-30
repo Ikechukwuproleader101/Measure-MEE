@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, Check, AlertCircle, ArrowRight, RotateCcw, User, Zap, ZapOff } from 'lucide-react';
 import { useMediaPipePose } from '../../hooks/useMediaPipePose';
+import { getStreamWithFallback, shouldAutoRetry } from '../../features/capture/cameraStream';
 
 /**
  * BodyCamera Component
@@ -42,6 +43,11 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
 
+  const [isCameraPlaying, setIsCameraPlaying] = useState(false);
+  const [restartKey, setRestartKey] = useState(0);
+  const startIdRef = useRef(0);
+  const autoRetriesRef = useRef(0);
+
   // Real-time on-device MediaPipe Pose detection & A-pose tracking
   const {
     isReady: isPoseReady,
@@ -50,7 +56,7 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
     reasons: poseReasons,
     landmarks: poseLandmarks,
   } = useMediaPipePose(videoRef, {
-    enabled: !holdingState.isHolding,
+    enabled: !holdingState.isHolding && isCameraPlaying,
     viewMode,
     fps: 15,
   });
@@ -70,63 +76,124 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
 
   // 1. Initialize High-Resolution getUserMedia Stream
   useEffect(() => {
-    let isMounted = true;
+    if (holdingState.isHolding) {
+      setIsCameraPlaying(false);
+      return;
+    }
+
+    let cancelled = false;
+    let watchdog = null;
+    const myId = ++startIdRef.current;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    const stopStream = () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
 
     async function initCamera() {
       setPermissionError(null);
-
-      // Stop existing tracks if any
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      setIsCameraPlaying(false);
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setPermissionError('Camera is not supported on this browser or device.');
         return;
       }
 
+      stopStream();
+      await sleep(150); // let the phone fully release the previous camera
+      if (cancelled) return;
+
       try {
-        const constraints = {
-          video: {
-            facingMode: { ideal: facingMode },
-            width: { ideal: 1920, max: 3840 },
-            height: { ideal: 1080, max: 2160 },
-          },
-          audio: false,
-        };
-
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-        if (!isMounted) {
-          stream.getTracks().forEach((track) => track.stop());
+        const stream = await getStreamWithFallback({ facingMode });
+        if (cancelled || myId !== startIdRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
           return;
         }
-
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
+
+        const video = videoRef.current;
+        if (!video) return;
+        video.muted = true;
+        video.playsInline = true;
+        video.srcObject = stream;
+        video.addEventListener('loadedmetadata', () => video.play().catch(() => {}), { once: true });
+        try {
+          await video.play();
+        } catch (e) {
+          if (e.name !== 'AbortError') console.warn('Video play failed:', e);
         }
+        if (cancelled) return;
+        setIsCameraPlaying(true);
+
+        // Safety net: if no picture arrives, restart the camera automatically.
+        watchdog = setTimeout(() => {
+          const v = videoRef.current;
+          if (cancelled || !v) return;
+          if (shouldAutoRetry({ videoWidth: v.videoWidth, readyState: v.readyState, retries: autoRetriesRef.current })) {
+            autoRetriesRef.current += 1;
+            setRestartKey((k) => k + 1);
+          } else if (v.videoWidth > 0) {
+            autoRetriesRef.current = 0;
+          }
+        }, 2500);
       } catch (err) {
-        if (isMounted) {
-          const errMsg = err instanceof Error ? err.message : 'Camera access denied';
-          setPermissionError(errMsg);
+        if (!cancelled) {
+          setPermissionError(err instanceof Error ? err.message : 'Camera access denied');
         }
       }
     }
 
-    // Only stream if not holding an image for review
-    if (!holdingState.isHolding) {
-      initCamera();
-    }
+    initCamera();
 
     return () => {
-      isMounted = false;
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      cancelled = true;
+      if (watchdog) clearTimeout(watchdog);
+      stopStream();
     };
-  }, [facingMode, holdingState.isHolding]);
+  }, [facingMode, holdingState.isHolding, restartKey]);
+
+  // Optional diagnostics (?debug=pose flag or console.debug)
+  const isDebugMode = typeof window !== 'undefined' && (
+    window.location.search.includes('debug=pose') ||
+    window.location.hash.includes('debug=pose')
+  );
+
+  const [debugState, setDebugState] = useState({
+    videoWidth: 0,
+    videoHeight: 0,
+    readyState: 0,
+    retries: 0,
+  });
+
+  useEffect(() => {
+    if (!isDebugMode) {
+      console.debug('[BodyCamera debug]', {
+        facingMode,
+        videoWidth: videoRef.current?.videoWidth || 0,
+        videoHeight: videoRef.current?.videoHeight || 0,
+        readyState: videoRef.current?.readyState || 0,
+        retries: autoRetriesRef.current,
+        isCameraPlaying,
+      });
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const v = videoRef.current;
+      setDebugState({
+        videoWidth: v?.videoWidth || 0,
+        videoHeight: v?.videoHeight || 0,
+        readyState: v?.readyState ?? 0,
+        retries: autoRetriesRef.current,
+      });
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [isDebugMode, facingMode, isCameraPlaying]);
 
   // Clean up Object URLs from browser RAM when unmounting
   useEffect(() => {
@@ -333,6 +400,17 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
         <div className="absolute top-20 left-4 right-4 z-40 bg-destructive/90 text-destructive-foreground p-3 rounded-2xl flex items-center gap-2 text-xs font-semibold shadow-lg backdrop-blur-md">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{permissionError}</span>
+        </div>
+      )}
+
+      {/* Debug Readout (?debug=pose only) */}
+      {isDebugMode && (
+        <div className="absolute top-20 left-4 z-40 bg-black/85 text-emerald-400 font-mono text-[10px] p-2.5 rounded-lg border border-emerald-500/30 shadow-lg pointer-events-none flex flex-col gap-0.5">
+          <div>Facing: {facingMode}</div>
+          <div>Resolution: {debugState.videoWidth}x{debugState.videoHeight}</div>
+          <div>ReadyState: {debugState.readyState}</div>
+          <div>Retries: {debugState.retries}</div>
+          <div>Playing: {isCameraPlaying ? 'true' : 'false'}</div>
         </div>
       )}
 

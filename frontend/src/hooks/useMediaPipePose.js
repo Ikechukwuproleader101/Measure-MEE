@@ -40,8 +40,16 @@ export function useMediaPipePose(videoRef, { enabled = true, viewMode = 'front',
 
   const frameIntervalMs = 1000 / fps;
 
-  // Initialize MediaPipe PoseLandmarker singleton
+  // Initialize MediaPipe PoseLandmarker singleton only when enabled
   useEffect(() => {
+    if (!enabled) return;
+
+    if (landmarkerRef.current) {
+      setIsReady(true);
+      setIsLoading(false);
+      return;
+    }
+
     let isCancelled = false;
 
     async function initModel() {
@@ -70,7 +78,7 @@ export function useMediaPipePose(videoRef, { enabled = true, viewMode = 'front',
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   // Reset stability counters when viewMode changes
   useEffect(() => {
@@ -87,6 +95,7 @@ export function useMediaPipePose(videoRef, { enabled = true, viewMode = 'front',
     if (!enabled || !isReady) {
       if (animFrameIdRef.current) {
         cancelAnimationFrame(animFrameIdRef.current);
+        animFrameIdRef.current = null;
       }
       return;
     }
@@ -183,6 +192,7 @@ export function useMediaPipePose(videoRef, { enabled = true, viewMode = 'front',
       isRunning = false;
       if (animFrameIdRef.current) {
         cancelAnimationFrame(animFrameIdRef.current);
+        animFrameIdRef.current = null;
       }
     };
   }, [enabled, isReady, viewMode, frameIntervalMs, videoRef]);
