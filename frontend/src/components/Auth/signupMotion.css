@@ -1,0 +1,143 @@
+/* Sign-up & Sign-in Tailoring Motion Specification */
+
+.illustration-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 724 / 554;
+  overflow: visible;
+  user-select: none;
+}
+
+.illustration-item {
+  position: absolute;
+  transform-origin: center;
+  will-change: transform;
+  animation-fill-mode: both;
+  pointer-events: none;
+}
+
+/* Floating animation for sewing machine, mannequin, and thimble */
+@keyframes gentle-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+/* Sway animation for needle, scissors, safety pin, and dress */
+@keyframes gentle-sway {
+  0%, 100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+
+/* Continuous slow rotation for yarn ball */
+@keyframes slow-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Gentle oscillating rotation for button */
+@keyframes slow-rotate-gentle {
+  0%, 100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+/* Horizontal & slight vertical drift for measuring tape */
+@keyframes gentle-drift {
+  0%, 100% {
+    transform: translate3d(-2px, 0, 0);
+  }
+  50% {
+    transform: translate3d(2px, -2px, 0);
+  }
+}
+
+/* Subtle scale pulse for pincushion */
+@keyframes soft-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+/* Individual animation timing variants per design spec */
+.anim-float-machine {
+  animation: gentle-float 3.8s ease-in-out -1.1s infinite;
+}
+
+.anim-rotate-yarn {
+  animation: slow-rotate 12s linear -4s infinite;
+}
+
+.anim-sway-needle {
+  animation: gentle-sway 4.5s ease-in-out -2s infinite;
+}
+
+.anim-pulse-pincushion {
+  animation: soft-pulse 4.6s ease-in-out -1.5s infinite;
+}
+
+.anim-sway-scissors {
+  animation: gentle-sway 3.6s ease-in-out -0.8s infinite;
+}
+
+.anim-float-mannequin {
+  animation: gentle-float 4.2s ease-in-out -0.7s infinite;
+}
+
+.anim-sway-safetypin {
+  animation: gentle-sway 4.8s ease-in-out -3.2s infinite;
+}
+
+.anim-drift-tape {
+  animation: gentle-drift 5.5s ease-in-out -3s infinite;
+}
+
+.anim-float-thimble {
+  animation: gentle-float 3.4s ease-in-out -2.5s infinite;
+}
+
+.anim-sway-dress {
+  transform-origin: 50% 12%;
+  animation: gentle-sway 4.3s ease-in-out -1.8s infinite;
+}
+
+.anim-rotate-button {
+  animation: slow-rotate-gentle 6s ease-in-out -0.5s infinite;
+}
+
+/* Accessibility: strictly disable decorative animations when user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .illustration-item,
+  .anim-float-machine,
+  .anim-rotate-yarn,
+  .anim-sway-needle,
+  .anim-pulse-pincushion,
+  .anim-sway-scissors,
+  .anim-float-mannequin,
+  .anim-sway-safetypin,
+  .anim-drift-tape,
+  .anim-float-thimble,
+  .anim-sway-dress,
+  .anim-rotate-button {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+

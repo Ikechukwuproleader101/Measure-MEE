@@ -3,6 +3,7 @@ import { Mail, ArrowLeft, X, Check, Lock, Eye, EyeOff, AlertCircle } from 'lucid
 import { useAuth } from '../../auth/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import { PillSpinner } from '../common/PillLoader';
+import './signupMotion.css';
 
 interface LoginScreenProps {
   onBack?: () => void;
@@ -10,49 +11,146 @@ interface LoginScreenProps {
   onCreateAccountClick?: () => void;
 }
 
+type AuthMode = 'entry' | 'email-signin' | 'email-signup' | 'forgot-password';
+type LegalModal = 'terms' | 'privacy' | null;
+
+// 11 Foreground Tailoring Illustrations with percentage layout and specific CSS animation classes
+const ILLUSTRATION_ITEMS = [
+  {
+    name: 'sewing-machine',
+    src: '/images/signup/sewing-machine.png',
+    alt: 'Sewing machine',
+    style: { left: '0.00%', top: '5.42%', width: '26.10%' },
+    className: 'anim-float-machine',
+  },
+  {
+    name: 'yarn-ball',
+    src: '/images/signup/yarn-ball.png',
+    alt: 'Yarn ball',
+    style: { left: '33.84%', top: '4.51%', width: '21.27%' },
+    className: 'anim-rotate-yarn',
+  },
+  {
+    name: 'needle-thread',
+    src: '/images/signup/needle-thread.png',
+    alt: 'Needle and thread',
+    style: { left: '58.70%', top: '3.61%', width: '22.51%' },
+    className: 'anim-sway-needle',
+  },
+  {
+    name: 'pincushion',
+    src: '/images/signup/pincushion.png',
+    alt: 'Pincushion',
+    style: { left: '85.64%', top: '16.25%', width: '13.67%' },
+    className: 'anim-pulse-pincushion',
+  },
+  {
+    name: 'scissors',
+    src: '/images/signup/scissors.png',
+    alt: 'Scissors',
+    style: { left: '3.45%', top: '34.30%', width: '29.70%' },
+    className: 'anim-sway-scissors',
+  },
+  {
+    name: 'mannequin',
+    src: '/images/signup/mannequin.png',
+    alt: 'Tailor mannequin',
+    style: { left: '41.44%', top: '29.78%', width: '12.98%' },
+    className: 'anim-float-mannequin',
+  },
+  {
+    name: 'safety-pin',
+    src: '/images/signup/safety-pin.png',
+    alt: 'Safety pin',
+    style: { left: '62.15%', top: '37.91%', width: '16.02%' },
+    className: 'anim-sway-safetypin',
+  },
+  {
+    name: 'measuring-tape',
+    src: '/images/signup/measuring-tape.png',
+    alt: 'Measuring tape',
+    style: { left: '0.00%', top: '68.59%', width: '28.45%' },
+    className: 'anim-drift-tape',
+  },
+  {
+    name: 'thimble',
+    src: '/images/signup/thimble.png',
+    alt: 'Thimble',
+    style: { left: '35.91%', top: '69.49%', width: '13.54%' },
+    className: 'anim-float-thimble',
+  },
+  {
+    name: 'dress',
+    src: '/images/signup/dress.png',
+    alt: 'Tailored dress',
+    style: { left: '65.61%', top: '60.47%', width: '16.85%' },
+    className: 'anim-sway-dress',
+  },
+  {
+    name: 'button',
+    src: '/images/signup/button.png',
+    alt: 'Button',
+    style: { left: '88.40%', top: '49.64%', width: '10.91%' },
+    className: 'anim-rotate-button',
+  },
+];
+
 export const LoginScreen: React.FC<LoginScreenProps> = ({
-  onBack,
+  onBack: _onBack,
   onSuccess,
   onCreateAccountClick,
 }) => {
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const [authMode, setAuthMode] = useState<AuthMode>('entry');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState<string | null>(null);
-  
-  const inputRef = useRef<HTMLInputElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
+  const [activeLegalModal, setActiveLegalModal] = useState<LegalModal>(null);
 
-  // Trigger feedback toast
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
   const triggerToast = (msg: string) => {
     setShowToast(msg);
     setTimeout(() => setShowToast(null), 3500);
   };
 
-  const handleClearEmail = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEmail('');
-    inputRef.current?.focus();
+  // Google OAuth Flow
+  const handleGoogleSignIn = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      await signInWithGoogle();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Google sign-in failed';
+      triggerToast(message);
+      setErrorMsg(message);
+      setIsLoading(false);
+    }
   };
 
-  const handleContinue = async (e?: React.FormEvent) => {
+  // Email Sign In Flow
+  const handleEmailSignIn = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isLoading) return;
     setErrorMsg(null);
 
     if (!email.trim() || !email.includes('@')) {
       triggerToast('Please enter a valid email address');
       setErrorMsg('Please enter a valid email address.');
+      emailInputRef.current?.focus();
       return;
     }
 
     if (!password) {
       triggerToast('Please enter your password');
       setErrorMsg('Please enter your password.');
-      passwordRef.current?.focus();
+      passwordInputRef.current?.focus();
       return;
     }
 
@@ -68,7 +166,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         onSuccess();
       }
     } catch {
-      // Per brief: On failure, show a single generic message. Do not reveal whether email exists.
       const genericError = 'Invalid email or password';
       setErrorMsg(genericError);
       triggerToast(genericError);
@@ -77,29 +174,60 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true);
+  // Email Registration Flow
+  const handleEmailSignUp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isLoading) return;
     setErrorMsg(null);
+
+    if (!email.trim() || !email.includes('@')) {
+      triggerToast('Please enter a valid email address');
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    if (password.length < 8) {
+      triggerToast('Password must be at least 8 characters');
+      setErrorMsg('Password must be at least 8 characters long.');
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
-      await signInWithGoogle();
+      const { session } = await signUp({
+        email: email.trim(),
+        password,
+        fullName: fullName.trim(),
+      });
+
+      if (session) {
+        onSuccess();
+      } else {
+        triggerToast('Account created! Please check your email to verify.');
+        setAuthMode('email-signin');
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Google sign-in failed';
-      triggerToast(message);
+      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
       setErrorMsg(message);
+      triggerToast(message);
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAppleSignIn = () => {
-    triggerToast('Apple sign-in is coming soon. Please sign in with Email or Google.');
-  };
-
-  const handleForgotPassword = async (e: React.MouseEvent) => {
+  // Forgot Password Flow
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     if (!email.trim() || !email.includes('@')) {
-      triggerToast('Enter your email above first to receive reset instructions');
+      triggerToast('Please enter your email to receive reset instructions');
+      setErrorMsg('Please enter a valid email address.');
       return;
     }
+
+    setIsLoading(true);
+    setErrorMsg(null);
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
@@ -107,263 +235,562 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       });
       if (error) throw error;
       triggerToast(`Password reset link sent to ${email.trim()}`);
+      setAuthMode('email-signin');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Could not send reset email';
       triggerToast(message);
+      setErrorMsg(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between overflow-x-hidden select-none font-sans pb-8">
-      {/* Toast notification */}
+    <div className="relative w-full h-full min-h-screen bg-[#050505] text-white flex flex-col justify-between overflow-x-hidden select-none font-sans">
+      {/* Toast Notification */}
       {showToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-popover/95 text-popover-foreground px-4 py-2.5 rounded-full text-xs font-medium shadow-xl backdrop-blur-md flex items-center gap-2 border-0 animate-fade-in">
-          <Check className="w-3.5 h-3.5 text-primary" />
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-[#1E1E24] text-white border border-[#C69AF3]/30 px-5 py-2.5 rounded-full text-xs font-medium shadow-2xl backdrop-blur-md flex items-center gap-2 animate-fade-in">
+          <Check className="w-3.5 h-3.5 text-[#C69AF3]" />
           <span>{showToast}</span>
         </div>
       )}
 
-      {/* Top Header Navigation (Battery indicator and fake status bar removed) */}
-      <header className="w-full pt-5 pb-2 px-6 flex items-center justify-between z-20">
-        {onBack ? (
-          <button
-            type="button"
-            onClick={onBack}
-            className="w-10 h-10 rounded-full bg-card shadow-sm flex items-center justify-center text-foreground hover:bg-muted transition-colors cursor-pointer active:scale-95 border-0"
-            title="Back to Onboarding"
-            aria-label="Back to Onboarding"
-          >
-            <ArrowLeft className="w-5 h-5 stroke-[2]" />
-          </button>
-        ) : (
-          <div className="w-10" />
-        )}
+      {/* VIEW 1: Primary Authentication Entry Screen (Matching Reference Mockup) */}
+      {authMode === 'entry' && (
+        <div className="flex-1 flex flex-col justify-between items-center w-full max-w-md mx-auto pt-8 sm:pt-12 pb-0 px-6 animate-fade-in">
+          {/* Top Header: Measure Me */}
+          <header className="w-full text-center">
+            <h1 className="text-[32px] sm:text-[36px] font-bold text-white tracking-normal font-sans">
+              Measure Me
+            </h1>
+          </header>
 
-        <div className="w-10" />
-      </header>
+          {/* Centerpiece: Animated Tailoring Illustration Stage */}
+          <div className="w-full max-w-[390px] my-auto py-2 relative flex items-center justify-center">
+            <div className="illustration-stage">
+              {/* Static Tailoring Doodle Strip (Layer 2) */}
+              <img
+                src="/images/signup/doodle-strip.png"
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none z-0"
+              />
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col justify-center px-6 py-4 max-w-md mx-auto w-full z-10">
-        {/* Brand Icon & Wordmark Section */}
-        <div className="flex flex-col items-center justify-center text-center pb-6">
-          {/* Logo Tape Ribbon Mascot */}
-          <div className="relative group transition-transform duration-300 hover:scale-105">
-            <img
-              src="/images/measureme-logo-purple.png"
-              alt="Measure Me Logo"
-              className="w-[72px] h-auto object-contain drop-shadow-sm select-none pointer-events-none"
-            />
+              {/* Foreground Animated Tailoring Icons (Layer 3) */}
+              {ILLUSTRATION_ITEMS.map((item) => (
+                <div
+                  key={item.name}
+                  className={`illustration-item z-10 ${item.className}`}
+                  style={item.style}
+                  aria-hidden="true"
+                >
+                  <img
+                    src={item.src}
+                    alt=""
+                    aria-hidden="true"
+                    className="w-full h-auto object-contain select-none pointer-events-none"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Title: Measure me */}
-          <h1 className="mt-3 text-[30px] font-extrabold tracking-tight text-foreground font-display flex items-center justify-center gap-1.5">
-            <span>Measure</span>
-            <span className="text-primary">me</span>
-          </h1>
-
-          {/* Subtitle */}
-          <p className="mt-1.5 text-[14px] leading-snug text-muted-foreground font-medium tracking-normal text-center">
-            Your body. Perfectly measured.
-            <br />
-            Anywhere.
-          </p>
-        </div>
-
-        {/* Input & Form Controls - Clean Flat, Zero Outline */}
-        <form onSubmit={handleContinue} className="flex flex-col gap-3.5 w-full items-stretch">
-          {/* Email Input Field */}
-          <div 
-            onClick={() => {
-              inputRef.current?.focus();
-              setIsFocused(true);
-            }}
-            className={`relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 transition-all duration-200 cursor-text border-0 box-border ${
-              isFocused 
-                ? 'bg-card shadow-md shadow-primary/10' 
-                : 'bg-card shadow-sm'
-            }`}
-          >
-            {/* Mail Icon in circular badge */}
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary">
-              <Mail className="w-4 h-4 stroke-[2]" />
-            </div>
-
-            {/* Real Editable Input - Guaranteed No Outline & Non-White Placeholder */}
-            <div className="relative flex-1 flex items-center overflow-hidden">
-              <input
-                ref={inputRef}
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                placeholder="Enter your email"
-                autoComplete="email"
-                className="w-full bg-transparent text-foreground text-[15px] font-normal tracking-normal border-0 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 shadow-none placeholder:text-[#727088] placeholder:opacity-100 select-text"
-              />
-            </div>
-
-            {/* Clear Button (Circle with X) */}
-            {email.length > 0 && (
+          {/* Bottom Actions Section */}
+          <div className="w-full max-w-[340px] flex flex-col items-center gap-4 z-10 mb-2">
+            {/* Legal Copy */}
+            <p className="text-center text-[15px] sm:text-[16px] text-[#EDEDED] leading-snug font-normal">
+              By continuing, you agree with
+              <br />
+              our{' '}
               <button
                 type="button"
-                onClick={handleClearEmail}
-                className="w-5 h-5 rounded-full bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0 border-0"
-                aria-label="Clear email"
+                onClick={() => setActiveLegalModal('terms')}
+                className="text-[#C69AF3] hover:underline font-medium cursor-pointer"
               >
-                <X className="w-3 h-3 stroke-[2.5]" />
+                Terms
+              </button>{' '}
+              and{' '}
+              <button
+                type="button"
+                onClick={() => setActiveLegalModal('privacy')}
+                className="text-[#C69AF3] hover:underline font-medium cursor-pointer"
+              >
+                Privacy Policy
               </button>
-            )}
+            </p>
+
+            {/* Lavender Pill Authentication Buttons */}
+            <div className="w-full flex flex-col gap-3">
+              {/* Continue with Google */}
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={handleGoogleSignIn}
+                className="w-full h-[56px] sm:h-[60px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-semibold text-[17px] sm:text-[18px] flex items-center justify-center gap-3 transition-all duration-150 cursor-pointer shadow-sm disabled:opacity-70"
+                aria-label="Continue with Google"
+              >
+                {isLoading ? (
+                  <PillSpinner />
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 fill-current text-[#080808] shrink-0" viewBox="0 0 24 24">
+                      <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
+                    </svg>
+                    <span>Continue with google</span>
+                  </>
+                )}
+              </button>
+
+              {/* Continue with Email */}
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => {
+                  setErrorMsg(null);
+                  setAuthMode('email-signin');
+                }}
+                className="w-full h-[56px] sm:h-[60px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-semibold text-[17px] sm:text-[18px] flex items-center justify-center gap-3 transition-all duration-150 cursor-pointer shadow-sm disabled:opacity-70"
+                aria-label="Continue with email"
+              >
+                <Mail className="w-5 h-5 text-[#080808] stroke-[2.2] shrink-0" />
+                <span>Continue with email</span>
+              </button>
+            </div>
+
+            {/* Signup Prompt */}
+            <div className="text-center text-[16px] sm:text-[17px] pt-1">
+              <span className="text-white">New User? </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onCreateAccountClick) {
+                    onCreateAccountClick();
+                  } else {
+                    setErrorMsg(null);
+                    setAuthMode('email-signup');
+                  }
+                }}
+                className="text-[#C69AF3] font-medium hover:underline cursor-pointer"
+              >
+                signup
+              </button>
+            </div>
           </div>
 
-          {/* Password Input Field */}
-          <div 
-            onClick={() => {
-              passwordRef.current?.focus();
-            }}
-            className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-card shadow-sm border-0 focus-within:shadow-md focus-within:shadow-primary/10 transition-all duration-200 cursor-text box-border"
-          >
-            {/* Lock Icon in circular badge */}
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary">
-              <Lock className="w-4 h-4 stroke-[2]" />
-            </div>
+          {/* Bottom Static Pattern Detail (Matching Reference Edge) */}
+          <div className="w-full pointer-events-none select-none overflow-hidden h-[16px]">
+            <img
+              src="/images/signup/bottom-doodle.png"
+              alt=""
+              aria-hidden="true"
+              className="w-full h-full object-cover object-top opacity-40"
+            />
+          </div>
+        </div>
+      )}
 
-            <div className="relative flex-1 flex items-center overflow-hidden">
-              <input
-                ref={passwordRef}
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                className="w-full bg-transparent text-foreground text-[15px] font-normal tracking-normal border-0 outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 shadow-none placeholder:text-[#727088] placeholder:opacity-100 pr-2 select-text"
-              />
-            </div>
-
+      {/* VIEW 2: Email Sign In Screen */}
+      {authMode === 'email-signin' && (
+        <div className="flex-1 flex flex-col justify-between items-center w-full max-w-md mx-auto pt-6 pb-6 px-6 animate-fade-in">
+          {/* Top Bar */}
+          <header className="w-full flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0 p-1 border-0"
-              aria-label="Toggle password visibility"
+              onClick={() => {
+                setErrorMsg(null);
+                setAuthMode('entry');
+              }}
+              className="w-10 h-10 rounded-full bg-[#18181B] hover:bg-[#27272A] flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
+              aria-label="Back to main screen"
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              <ArrowLeft className="w-5 h-5" />
             </button>
+            <span className="text-[20px] font-bold text-white">Measure Me</span>
+            <div className="w-10" />
+          </header>
+
+          {/* Form Content */}
+          <div className="w-full max-w-[340px] my-auto py-6 flex flex-col gap-5">
+            <div className="text-center mb-1">
+              <h2 className="text-[26px] font-bold text-white">Welcome Back</h2>
+              <p className="text-[14px] text-[#A1A1AA] mt-1">
+                Enter your credentials to access your measurements
+              </p>
+            </div>
+
+            <form onSubmit={handleEmailSignIn} className="flex flex-col gap-3.5 w-full">
+              {/* Email Input */}
+              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+                <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <input
+                  ref={emailInputRef}
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                />
+                {email.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setEmail('')}
+                    className="w-5 h-5 rounded-full bg-white/10 text-white flex items-center justify-center cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Password Input */}
+              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+                <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <input
+                  ref={passwordInputRef}
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[#71717A] hover:text-white cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {errorMsg && (
+                <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-2xl flex items-center gap-2 text-xs text-red-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {/* Sign In Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
+              >
+                {isLoading ? <PillSpinner /> : 'Sign in'}
+              </button>
+
+              {/* Forgot Password */}
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorMsg(null);
+                    setAuthMode('forgot-password');
+                  }}
+                  className="text-[13px] text-[#A1A1AA] hover:text-[#C69AF3] transition-colors cursor-pointer"
+                >
+                  Forgot your password?
+                </button>
+              </div>
+            </form>
           </div>
 
-          {/* Error Banner if error exists */}
-          {errorMsg && (
-            <div className="p-3 bg-destructive/10 rounded-2xl flex items-center gap-2 text-xs text-destructive animate-fade-in font-medium border-0">
-              <AlertCircle className="w-4 h-4 shrink-0 text-destructive" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* Primary Continue Button - Identical width and geometry to inputs */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            aria-busy={isLoading}
-            className={`w-full h-[54px] rounded-2xl font-bold text-[15px] tracking-tight flex items-center justify-center gap-1.5 transition-all duration-150 select-none border-0 box-border ${
-              isLoading
-                ? 'bg-muted text-muted-foreground shadow-sm cursor-not-allowed'
-                : 'bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground shadow-md shadow-primary/25 cursor-pointer active:scale-[0.99]'
-            }`}
-          >
-            {isLoading ? (
-              <PillSpinner />
-            ) : (
-              <>
-                <span>Sign in</span>
-                <span className="text-base font-normal leading-none ml-0.5">→</span>
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Divider: "or" */}
-        <div className="flex items-center my-4 px-1">
-          <div className="flex-1 h-[1px] bg-border/40" />
-          <span className="px-3 text-[13px] text-muted-foreground font-normal lowercase tracking-normal">
-            or
-          </span>
-          <div className="flex-1 h-[1px] bg-border/40" />
-        </div>
-
-        {/* Social Authentication Buttons */}
-        <div className="flex flex-col gap-2.5 w-full">
-          {/* Continue with Google */}
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={handleGoogleSignIn}
-            className="w-full h-[54px] rounded-2xl bg-card hover:bg-muted active:bg-muted text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-3 shadow-sm border-0 transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-60"
-          >
-            {/* Google colored G icon inside circular badge */}
-            <div className="w-7 h-7 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-            </div>
-            <span>Continue with Google</span>
-          </button>
-
-          {/* Continue with Apple */}
-          <button
-            type="button"
-            onClick={handleAppleSignIn}
-            className="w-full h-[54px] rounded-2xl bg-card hover:bg-muted active:bg-muted text-foreground font-semibold text-[14px] sm:text-[15px] flex items-center justify-center gap-3 shadow-sm border-0 transition-all duration-150 cursor-pointer active:scale-[0.99]"
-          >
-            {/* Apple icon inside circular badge */}
-            <div className="w-7 h-7 rounded-full bg-secondary/80 flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 fill-current text-foreground shrink-0" viewBox="0 0 170 170">
-                <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.74 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.08-7.7-7.89-12-14.43-6.19-9.47-10.9-20.48-14.13-33.03-3.23-12.56-4.85-24.3-4.85-35.24 0-14.61 3.69-26.79 11.07-36.54 7.39-9.76 16.63-14.77 27.72-15.03 4.58 0 9.87 1.25 15.87 3.75 6 2.5 10.22 3.82 12.66 3.97 1.9-.27 6.25-1.63 13.06-4.09 6.81-2.46 12.35-3.56 16.63-3.3 12.28.64 22.18 5.22 29.7 13.74-10.84 6.59-16.14 15.67-15.91 27.24.23 9.4 3.93 17.26 11.11 23.59 7.18 6.33 15.67 10.05 25.48 11.15-2.23 6.94-4.87 13.68-7.91 20.22zM119.22 31.84c0-7.39 2.63-14.14 7.89-20.25 5.26-6.12 11.75-9.98 19.46-11.59.34 1.12.51 2.37.51 3.75 0 7.39-2.73 14.28-8.19 20.67-5.46 6.39-11.95 10.15-19.46 11.27-.07-1.28-.21-2.56-.21-3.85z" />
-              </svg>
-            </div>
-            <span>Continue with Apple</span>
-          </button>
-        </div>
-
-        {/* Forgot password link */}
-        <div className="pt-3 pb-3 text-center">
-          <button
-            type="button"
-            onClick={handleForgotPassword}
-            className="text-[13px] font-normal text-muted-foreground hover:text-primary transition-colors cursor-pointer border-0"
-          >
-            Forgot your password?
-          </button>
-        </div>
-
-        {/* Sign up link */}
-        {onCreateAccountClick && (
-          <div className="text-center pb-2">
+          {/* Bottom Switcher */}
+          <div className="text-center text-[14px]">
+            <span className="text-[#A1A1AA]">Don't have an account? </span>
             <button
               type="button"
-              onClick={onCreateAccountClick}
-              className="text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer border-0"
+              onClick={() => {
+                if (onCreateAccountClick) {
+                  onCreateAccountClick();
+                } else {
+                  setErrorMsg(null);
+                  setAuthMode('email-signup');
+                }
+              }}
+              className="text-[#C69AF3] font-medium hover:underline cursor-pointer"
             >
-              Don't have an account? <span className="text-primary font-semibold">Sign up</span>
+              Sign up
             </button>
           </div>
-        )}
-      </main>
+        </div>
+      )}
+
+      {/* VIEW 3: Email Sign Up Screen */}
+      {authMode === 'email-signup' && (
+        <div className="flex-1 flex flex-col justify-between items-center w-full max-w-md mx-auto pt-6 pb-6 px-6 animate-fade-in">
+          {/* Top Bar */}
+          <header className="w-full flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMsg(null);
+                setAuthMode('entry');
+              }}
+              className="w-10 h-10 rounded-full bg-[#18181B] hover:bg-[#27272A] flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
+              aria-label="Back to main screen"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <span className="text-[20px] font-bold text-white">Measure Me</span>
+            <div className="w-10" />
+          </header>
+
+          {/* Form Content */}
+          <div className="w-full max-w-[340px] my-auto py-6 flex flex-col gap-5">
+            <div className="text-center mb-1">
+              <h2 className="text-[26px] font-bold text-white">Create Account</h2>
+              <p className="text-[14px] text-[#A1A1AA] mt-1">
+                Start your bespoke digital fitting profile
+              </p>
+            </div>
+
+            <form onSubmit={handleEmailSignUp} className="flex flex-col gap-3.5 w-full">
+              {/* Full Name */}
+              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Full name (optional)"
+                  autoComplete="name"
+                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+                <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+                <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password (min 8 characters)"
+                  autoComplete="new-password"
+                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[#71717A] hover:text-white cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {errorMsg && (
+                <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-2xl flex items-center gap-2 text-xs text-red-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {/* Create Account Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
+              >
+                {isLoading ? <PillSpinner /> : 'Create Account'}
+              </button>
+            </form>
+          </div>
+
+          {/* Bottom Switcher */}
+          <div className="text-center text-[14px]">
+            <span className="text-[#A1A1AA]">Already have an account? </span>
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMsg(null);
+                setAuthMode('email-signin');
+              }}
+              className="text-[#C69AF3] font-medium hover:underline cursor-pointer"
+            >
+              Sign in
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 4: Forgot Password Screen */}
+      {authMode === 'forgot-password' && (
+        <div className="flex-1 flex flex-col justify-between items-center w-full max-w-md mx-auto pt-6 pb-6 px-6 animate-fade-in">
+          {/* Top Bar */}
+          <header className="w-full flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMsg(null);
+                setAuthMode('email-signin');
+              }}
+              className="w-10 h-10 rounded-full bg-[#18181B] hover:bg-[#27272A] flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
+              aria-label="Back to sign in"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <span className="text-[20px] font-bold text-white">Measure Me</span>
+            <div className="w-10" />
+          </header>
+
+          {/* Form Content */}
+          <div className="w-full max-w-[340px] my-auto py-6 flex flex-col gap-5">
+            <div className="text-center mb-1">
+              <h2 className="text-[26px] font-bold text-white">Reset Password</h2>
+              <p className="text-[14px] text-[#A1A1AA] mt-1">
+                Enter your email address and we'll send you a password recovery link
+              </p>
+            </div>
+
+            <form onSubmit={handleForgotPassword} className="flex flex-col gap-3.5 w-full">
+              <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+                <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+                />
+              </div>
+
+              {errorMsg && (
+                <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-2xl flex items-center gap-2 text-xs text-red-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-[54px] rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mt-2 disabled:opacity-70"
+              >
+                {isLoading ? <PillSpinner /> : 'Send Reset Link'}
+              </button>
+            </form>
+          </div>
+
+          <div className="text-center text-[14px]">
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMsg(null);
+                setAuthMode('email-signin');
+              }}
+              className="text-[#C69AF3] font-medium hover:underline cursor-pointer"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Accessible Terms & Privacy Policy Modal */}
+      {activeLegalModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+          onClick={() => setActiveLegalModal(null)}
+        >
+          <div
+            className="w-full max-w-md bg-[#111111] border border-white/15 rounded-3xl p-6 text-white shadow-2xl relative max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <h3 className="text-xl font-bold text-white">
+                {activeLegalModal === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setActiveLegalModal(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                aria-label="Close dialog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto py-4 text-sm text-[#D4D4D8] leading-relaxed space-y-3 pr-2">
+              {activeLegalModal === 'terms' ? (
+                <>
+                  <p>
+                    Welcome to <strong>Measure Me</strong>. By accessing or using our bespoke 3D
+                    body contour and measurement application, you agree to comply with and be bound
+                    by these terms.
+                  </p>
+                  <p>
+                    <strong>1. Use of Service:</strong> Measure Me provides computer vision-assisted
+                    tailoring measurements to assist clients and tailors in creating bespoke
+                    garments.
+                  </p>
+                  <p>
+                    <strong>2. Account Security:</strong> You are responsible for maintaining the
+                    confidentiality of your login credentials and for all activities that occur under
+                    your account.
+                  </p>
+                  <p>
+                    <strong>3. Content & Data:</strong> Measurements, photos, and project notes are
+                    processed securely and used solely for tailoring analysis and garment fitting.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Your privacy is essential to us at <strong>Measure Me</strong>. We are committed
+                    to protecting your personal information and body measurement data.
+                  </p>
+                  <p>
+                    <strong>1. On-Device Processing:</strong> Pose tracking and pose evaluation
+                    occur directly on your local device hardware using MediaPipe vision models.
+                  </p>
+                  <p>
+                    <strong>2. Data Usage:</strong> Measurement captures are encrypted in transit and
+                    stored in secure cloud infrastructure solely to deliver your bespoke tailor
+                    dimensions.
+                  </p>
+                  <p>
+                    <strong>3. No Sale of Personal Data:</strong> We never sell, rent, or monetize
+                    your personal photos or anatomical metrics to third parties.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-white/10 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveLegalModal(null)}
+                className="w-full h-11 rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] text-[#080808] font-bold text-sm transition-all cursor-pointer"
+              >
+                Understood
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

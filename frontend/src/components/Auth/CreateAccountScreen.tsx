@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { ArrowLeft, Eye, EyeOff, User, Mail, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, User, Mail, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
+import { PillSpinner } from '../common/PillLoader';
 
 interface CreateAccountScreenProps {
   onBack: () => void;
@@ -25,6 +25,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setErrorMsg(null);
 
     if (!email.trim() || !email.includes('@')) {
@@ -60,139 +61,135 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between px-6 py-5 overflow-y-auto max-w-lg mx-auto">
-      {/* Subtle atmospheric glow matching Onboarding */}
-      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
+    <div className="relative w-full h-full min-h-screen bg-[#050505] text-white flex flex-col justify-between px-6 py-6 overflow-y-auto max-w-md mx-auto select-none font-sans">
       {/* Top Header */}
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-8">
-          <button 
-            onClick={onBack}
-            className="w-10 h-10 rounded-full bg-secondary hover:bg-secondary/80 shadow-sm border-0 flex items-center justify-center text-secondary-foreground transition-all cursor-pointer active:scale-95"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+      <header className="flex items-center justify-between z-10 w-full">
+        <button 
+          type="button"
+          onClick={onBack}
+          className="w-10 h-10 rounded-full bg-[#18181B] hover:bg-[#27272A] flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
+          aria-label="Back to sign in"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
 
-          <div className="flex items-center gap-2">
-            <img 
-              src="/images/measureme-logo-purple.png" 
-              alt="Measure Me Logo" 
-              className="w-6 h-auto object-contain"
-            />
-            <span className="font-display font-bold text-base tracking-tight text-foreground">
-              Measure <span className="text-primary">me</span>
-            </span>
-          </div>
+        <span className="font-bold text-[20px] text-white">Measure Me</span>
 
-          <div className="w-10" /> {/* Balancer */}
-        </div>
+        <div className="w-10" />
+      </header>
 
-        {/* Title & Subtitle */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-black tracking-tight text-foreground font-display">
-            Create your account
+      {/* Center Form Section */}
+      <div className="my-auto py-6 w-full max-w-[340px] mx-auto z-10 flex flex-col gap-5">
+        <div className="text-center mb-1">
+          <h1 className="text-[28px] font-bold tracking-tight text-white font-sans">
+            Create Account
           </h1>
-          <p className="text-sm text-muted-foreground mt-2 font-medium leading-relaxed">
-            Sign up now to start your bespoke digital fitting profile.
+          <p className="text-[14px] text-[#A1A1AA] mt-1 font-medium">
+            Start your bespoke digital fitting profile
           </p>
         </div>
 
         {/* Form Inputs */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 w-full">
           {/* Full Name */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full name</label>
-            <div className="relative flex items-center">
-              <input 
-                type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Ada Lovelace"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 text-sm text-foreground placeholder:text-[#727088] placeholder:opacity-100 transition-all outline-none focus:outline-none"
-              />
-              <User className="absolute right-4 w-4 h-4 text-muted-foreground" />
-            </div>
+          <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+            <User className="w-4 h-4 text-[#C69AF3] shrink-0" />
+            <input 
+              type="text"
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Full name (e.g. Ada Lovelace)"
+              autoComplete="name"
+              className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+            />
           </div>
 
           {/* Email Address */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email address</label>
-            <div className="relative flex items-center">
-              <input 
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ada@example.com"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 text-sm text-foreground placeholder:text-[#727088] placeholder:opacity-100 transition-all outline-none focus:outline-none"
-              />
-              <Mail className="absolute right-4 w-4 h-4 text-muted-foreground" />
-            </div>
+          <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+            <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
+            <input 
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email address"
+              autoComplete="email"
+              className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+            />
           </div>
 
           {/* Password */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-            <div className="relative flex items-center">
-              <input 
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter a secure password (min. 8 characters)"
-                className="w-full h-13 bg-card hover:bg-card/90 focus:bg-card shadow-sm border-0 focus:ring-2 focus:ring-primary/25 rounded-2xl px-4 pr-11 text-sm text-foreground placeholder:text-[#727088] placeholder:opacity-100 transition-all outline-none focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                aria-label="Toggle password visibility"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+          <div className="relative w-full h-[54px] rounded-2xl px-4 flex items-center gap-3 bg-[#18181B] border border-white/10 focus-within:border-[#C69AF3] transition-all">
+            <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
+            <input 
+              type={showPassword ? 'text' : 'password'}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password (min 8 characters)"
+              autoComplete="new-password"
+              className="w-full bg-transparent text-white text-[15px] outline-none border-0 placeholder:text-[#71717A]"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="text-[#71717A] hover:text-white cursor-pointer"
+              aria-label="Toggle password visibility"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* Error Banner */}
           {errorMsg && (
-            <div className="p-3 bg-destructive/10 rounded-2xl flex items-center gap-2 text-xs text-destructive animate-fade-in font-medium border-0">
-              <AlertCircle className="w-4 h-4 shrink-0 text-destructive" />
+            <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-2xl flex items-center gap-2 text-xs text-red-400 font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {/* Confirmation Required Banner */}
           {confirmationRequired && (
-            <div className="p-3 bg-primary/10 rounded-2xl flex items-center gap-2 text-xs text-primary animate-fade-in font-medium border-0">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-primary" />
+            <div className="p-3 bg-[#C69AF3]/20 border border-[#C69AF3]/40 rounded-2xl flex items-center gap-2 text-xs text-[#C69AF3] font-medium">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-[#C69AF3]" />
               <span>Check your email to confirm your account before logging in.</span>
             </div>
           )}
 
-          {/* Submit CTA */}
-          <Button
+          {/* Submit Button */}
+          <button
             type="submit"
             disabled={isLoading}
-            isLoading={isLoading}
-            className="w-full h-13 mt-4 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md shadow-primary/25 border-0"
+            className="w-full h-[56px] mt-2 rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[16px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-70"
           >
-            Create account
-          </Button>
+            {isLoading ? <PillSpinner /> : 'Create Account'}
+          </button>
         </form>
       </div>
 
-      {/* Bottom Link */}
-      <div className="relative z-10 pt-8 pb-4 text-center">
+      {/* Bottom Switch Link */}
+      <div className="z-10 pt-4 pb-2 text-center">
         <button 
+          type="button"
           onClick={onLoginClick}
-          className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          className="text-sm font-medium text-[#A1A1AA] hover:text-white transition-colors cursor-pointer"
         >
-          Already have an account? <span className="text-primary font-bold">Log in</span>
+          Already have an account? <span className="text-[#C69AF3] font-bold hover:underline">Log in</span>
         </button>
+      </div>
+
+      {/* Subtle Bottom Doodle Strip */}
+      <div className="w-full pointer-events-none select-none overflow-hidden h-[16px]">
+        <img
+          src="/images/signup/bottom-doodle.png"
+          alt=""
+          aria-hidden="true"
+          className="w-full h-full object-cover object-top opacity-40"
+        />
       </div>
     </div>
   );
 };
+
+export default CreateAccountScreen;
