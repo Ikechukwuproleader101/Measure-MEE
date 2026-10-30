@@ -1,4 +1,4 @@
-// not used by the live camera
+// still used by uploads / side photo
 import { IDX, THRESHOLDS as T } from "./poseConstants.js";
 
 const REQUIRED = [
@@ -14,7 +14,7 @@ const px = (p, w, h) => ({ x: p.x * w, y: p.y * h });
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 // Angle in degrees at point b, between the lines b->a and b->c.
-function angleAt(a, b, c) {
+export function angleAt(a, b, c) {
   const v1 = { x: a.x - b.x, y: a.y - b.y };
   const v2 = { x: c.x - b.x, y: c.y - b.y };
   const m = Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y);

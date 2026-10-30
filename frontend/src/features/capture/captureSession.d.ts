@@ -11,6 +11,7 @@ export interface CaptureResult {
   capturedAt: number;
   valid?: boolean;
   validationError?: string | null;
+  verified?: boolean;
 }
 
 export type CaptureStep =

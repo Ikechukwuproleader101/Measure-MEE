@@ -86,6 +86,7 @@ export async function analyzeCanvas({ canvas, view, validator, source = "camera"
       capturedAt: Date.now(),
       valid,
       validationError,
+      verified: valid,
     };
   } catch (err) {
     console.error("analyzeCanvas error:", err);

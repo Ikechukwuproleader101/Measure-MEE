@@ -1,3 +1,4 @@
+// still used by uploads / side photo
 import { IDX, SIDE_THRESHOLDS as T } from "./poseConstants.js";
 
 const px = (p, w, h) => ({ x: p.x * w, y: p.y * h });

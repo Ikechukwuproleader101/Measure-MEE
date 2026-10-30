@@ -16,15 +16,16 @@ import {
   Upload,
   Edit2,
   FileImage,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { usePoseValidation } from '../../features/capture/usePoseValidation';
 import { validateAPose } from '../../features/capture/validateAPose';
 import { validateSidePose } from '../../features/capture/validateSidePose';
-import { FIT_CONFIG, GUIDE, AUTO_START_WHEN_GREEN } from '../../features/capture/poseConstants';
-import { guideState } from '../../features/capture/guideState';
-import { parsePoseDebug, placeGuide } from '../../features/capture/poseGuide';
-import { PoseGuideOverlay } from '../../features/capture/PoseGuideOverlay';
-import { shouldCaptureAtZero, fitToGuide, boxToArtwork } from '../../features/capture/fitToGuide';
+import { RULES, AUTO_START_WHEN_GREEN, shouldCaptureAtZero } from '../../features/capture/poseRules';
+import { evaluatePose } from '../../features/capture/evaluatePose';
+import { requestTiltPermission } from '../../features/capture/useDeviceTilt';
+import { unlockAudio, isAudioMuted, setAudioMuted } from '../../features/capture/cues';
 import { captureFrame, processUploadedImage } from '../../features/capture/captureFrame';
 import {
   captureReducer,
@@ -82,13 +83,21 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
   const isCameraActive = session.step === 'camera';
   const activeCameraView = session.cameraView || 'front';
   const activeValidator = activeCameraView === 'front' ? validateAPose : validateSidePose;
-  const isDebugPose = typeof window !== 'undefined' ? parsePoseDebug(window.location) : false;
+  const isDebugPose = typeof window !== 'undefined'
+    ? window.location.search.includes('debug=pose') || window.location.hash.includes('debug=pose')
+    : false;
 
-  // Debug calibration mode: record pose state
-  const [isRecordingPose, setIsRecordingPose] = useState(false);
-  const [recordedFrames, setRecordedFrames] = useState<any[]>([]);
-  const [recordedPoseJson, setRecordedPoseJson] = useState<string | null>(null);
-  const [copiedJson, setCopiedJson] = useState(false);
+  // Feedback failure tracking and attempt log
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [attemptLog, setAttemptLog] = useState<any[]>([]);
+  const [copiedLog, setCopiedLog] = useState(false);
+  const [isMuted, setIsMuted] = useState(isAudioMuted);
+  const countdownStartTimeRef = useRef(0);
+
+  // Reset failure count when camera view changes
+  useEffect(() => {
+    setFailedAttempts(0);
+  }, [activeCameraView]);
 
   // Real-time on-device MediaPipe Pose detection (only active during camera step)
   const {
@@ -98,7 +107,9 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
     error: poseError,
     personVisible,
     lastValidAtMs,
-    fitResult,
+    parts: poseParts,
+    metrics: poseMetrics,
+    tilt: poseTilt,
   } = usePoseValidation({
     videoRef,
     canvasRef,
@@ -108,6 +119,7 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
     showSkeleton: isDebugPose,
     viewMode: activeCameraView,
     mirrored: facingMode === 'user',
+    isCountdownActive: countdown !== null,
   });
 
   const showNotification = (msg: string) => {
@@ -198,160 +210,64 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
     };
   }, [session.front?.previewUrl, session.side?.previewUrl]);
 
-  // Finish recording calibration pose and construct artwork JSON
-  const finishRecordingPose = useCallback(
-    (frames: any[]) => {
-      if (!frames.length) return;
-      const jointNames = [
-        'nose',
-        'leftShoulder',
-        'rightShoulder',
-        'leftElbow',
-        'rightElbow',
-        'leftWrist',
-        'rightWrist',
-        'leftHip',
-        'rightHip',
-        'leftKnee',
-        'rightKnee',
-        'leftAnkle',
-        'rightAnkle',
-      ];
-      const isMirrored = facingMode === 'user';
-
-      const artworkJointPoints: Record<string, { x: number; y: number }[]> = {};
-      for (const name of jointNames) {
-        artworkJointPoints[name] = [];
-      }
-
-      for (const f of frames) {
-        for (const name of jointNames) {
-          if (f.joints[name]) {
-            const artPt = boxToArtwork(f.joints[name], f.placement, isMirrored);
-            artworkJointPoints[name].push(artPt);
-          }
-        }
-      }
-
-      const output: Record<string, { x: number; y: number; r: number; jitter: number }> = {};
-      for (const name of jointNames) {
-        const pts = artworkJointPoints[name];
-        if (pts.length > 0) {
-          const meanX = pts.reduce((acc, p) => acc + p.x, 0) / pts.length;
-          const meanY = pts.reduce((acc, p) => acc + p.y, 0) / pts.length;
-          const variance =
-            pts.reduce((acc, p) => acc + Math.pow(p.x - meanX, 2) + Math.pow(p.y - meanY, 2), 0) / pts.length;
-          const jitter = Math.round(Math.sqrt(variance) * 10) / 10;
-          const defaultR = (GUIDE.radii as Record<string, number> | undefined)?.[name] || 24;
-          output[name] = {
-            x: Math.round(meanX * 10) / 10,
-            y: Math.round(meanY * 10) / 10,
-            r: defaultR,
-            jitter,
-          };
-        }
-      }
-
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG POSE] Recorded Pose Calibration:', output);
-      setRecordedPoseJson(JSON.stringify({ joints: output }, null, 2));
-    },
-    [facingMode]
-  );
-
-  // Frame collector for Record Pose calibration mode (30 frames)
-  useEffect(() => {
-    if (!isRecordingPose || !fitResult?.joints?.length) return;
-    const container = cameraContainerRef.current;
-    const video = videoRef.current;
-    if (!container || !video) return;
-
-    const boxW = container.clientWidth;
-    const boxH = container.clientHeight;
-    const { k, tx, ty } = placeGuide({
-      videoW: video.videoWidth || 720,
-      videoH: video.videoHeight || 1280,
-      boxW,
-      boxH,
-      fit: 'cover',
-      guide: GUIDE,
-    });
-
-    const frameJoints: Record<string, { x: number; y: number }> = {};
-    for (const j of fitResult.joints) {
-      if (j.x !== undefined && j.y !== undefined && j.dist !== Infinity) {
-        frameJoints[j.name] = { x: j.x, y: j.y };
-      }
-    }
-
-    setRecordedFrames((prev) => {
-      const next = [...prev, { joints: frameJoints, placement: { k, tx, ty } }];
-      if (next.length >= 30) {
-        finishRecordingPose(next);
-        setIsRecordingPose(false);
-      }
-      return next;
-    });
-  }, [isRecordingPose, fitResult, facingMode, finishRecordingPose]);
-
   // Execute frame capture using unmirrored IMAGE mode landmarker
-  const executeCapture = useCallback(async () => {
-    if (!videoRef.current || isCapturing) return;
+  const executeCapture = useCallback(
+    async (isCaptureAnyway = false) => {
+      if (!videoRef.current || isCapturing) return;
 
-    setIsCapturing(true);
-    setIsScreenFlashing(true);
-    setTimeout(() => setIsScreenFlashing(false), 200);
+      setIsCapturing(true);
+      setIsScreenFlashing(true);
+      setTimeout(() => setIsScreenFlashing(false), 200);
 
-    const captureValidator =
-      activeCameraView === 'front'
-        ? (rawJoints: any) => {
-            const container = cameraContainerRef.current;
-            const video = videoRef.current;
-            if (!container || !video) return { valid: true, reasons: [] };
-            const boxW = container.clientWidth;
-            const boxH = container.clientHeight;
-            const videoW = video.videoWidth || 720;
-            const videoH = video.videoHeight || 1280;
-            const placement = placeGuide({ videoW, videoH, boxW, boxH, fit: 'cover', guide: GUIDE });
-            const result = fitToGuide({
-              landmarks: rawJoints,
-              placement,
-              videoW,
-              videoH,
-              boxW,
-              boxH,
-              mirrored: facingMode === 'user',
-              radiusScale: FIT_CONFIG.captureRadiusScale,
-              guide: GUIDE,
-            });
-            return {
-              valid: result.pass,
-              reasons: result.hint ? [result.hint] : [],
-            };
-          }
-        : activeValidator;
+      const captureValidator =
+        isCaptureAnyway
+          ? () => ({ valid: true, reasons: [] })
+          : activeCameraView === 'front'
+          ? (rawJoints: any) => {
+              const video = videoRef.current;
+              if (!video) return { valid: true, reasons: [] };
+              const videoW = video.videoWidth || 720;
+              const videoH = video.videoHeight || 1280;
+              const evalResult = evaluatePose({
+                landmarks: rawJoints,
+                videoW,
+                videoH,
+                mirrored: facingMode === 'user',
+                rangeScale: RULES.capture.rangeScale,
+              });
+              return {
+                valid: evalResult.pass,
+                reasons: evalResult.hint ? [evalResult.hint] : [],
+              };
+            }
+          : activeValidator;
 
-    const result = await captureFrame({
-      video: videoRef.current,
-      view: activeCameraView,
-      validator: captureValidator,
-    });
+      const result = await captureFrame({
+        video: videoRef.current,
+        view: activeCameraView,
+        validator: captureValidator,
+      });
 
-    if ('error' in result) {
-      showNotification(result.error);
-      setIsCapturing(false);
-    } else {
-      dispatch(setCaptureAction(activeCameraView, result));
-      setIsCapturing(false);
-    }
-  }, [activeCameraView, activeValidator, facingMode, isCapturing]);
+      if ('error' in result) {
+        showNotification(result.error);
+        setIsCapturing(false);
+      } else {
+        result.verified = !isCaptureAnyway;
+        dispatch(setCaptureAction(activeCameraView, result));
+        setIsCapturing(false);
+        setFailedAttempts(0);
+      }
+    },
+    [activeCameraView, activeValidator, facingMode, isCapturing]
+  );
 
   // Optional auto-start when green (configured by AUTO_START_WHEN_GREEN)
   useEffect(() => {
     if (!isCameraActive || isCapturing || !AUTO_START_WHEN_GREEN) return;
 
     if (isPoseValid && countdown === null) {
-      setCountdown(FIT_CONFIG.countdownSeconds);
+      countdownStartTimeRef.current = performance.now();
+      setCountdown(RULES.capture.countdownSeconds);
     }
   }, [isCameraActive, isPoseValid, isCapturing, countdown]);
 
@@ -366,32 +282,106 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
       return () => clearTimeout(timer);
     } else if (countdown === 0) {
       setCountdown(null);
+      const now = performance.now();
       const canCapture = shouldCaptureAtZero({
         isValid: isPoseValid,
         lastValidAtMs,
-        nowMs: performance.now(),
-        graceMs: FIT_CONFIG.captureGraceMs,
+        nowMs: now,
+        graceMs: RULES.capture.graceMs,
       });
 
+      const usedGrace = !isPoseValid && canCapture;
+
+      // Log attempt
+      const attemptEntry = {
+        timestamp: new Date().toISOString(),
+        view: activeCameraView,
+        passed: canCapture,
+        usedGrace,
+        captureAnyway: false,
+        secondsToGreen:
+          countdownStartTimeRef.current && lastValidAtMs > countdownStartTimeRef.current
+            ? Math.round((lastValidAtMs - countdownStartTimeRef.current) / 100) / 10
+            : null,
+        failingParts: Object.entries(poseParts || {})
+          .filter(([_, v]: any) => v?.state === 'bad')
+          .map(([k]) => k),
+        metrics: poseMetrics
+          ? {
+              leftArmAngle: Math.round(poseMetrics.leftArmAngle),
+              rightArmAngle: Math.round(poseMetrics.rightArmAngle),
+              spread: Math.round((poseMetrics.spread || 0) * 100) / 100,
+              shoulderTilt: Math.round(poseMetrics.shoulderTilt),
+              torsoLean: Math.round(poseMetrics.torsoLean),
+            }
+          : null,
+      };
+      setAttemptLog((prev) => [attemptEntry, ...prev]);
+
       if (canCapture) {
-        executeCapture();
+        setFailedAttempts(0);
+        executeCapture(false);
       } else {
-        showNotification('Not quite. Match the outline and try again.');
+        setFailedAttempts((prev) => prev + 1);
+        showNotification('Not quite. Check the red parts and try again.');
       }
     }
-  }, [countdown, executeCapture, isPoseValid, lastValidAtMs]);
+  }, [countdown, executeCapture, isPoseValid, lastValidAtMs, activeCameraView, poseParts, poseMetrics]);
 
   // Capture button: always enabled once camera is active. Pressing during countdown cancels it.
   const handleManualShutter = () => {
     if (!hasCameraStream || isCapturing) return;
     if (countdown !== null) {
       setCountdown(null);
+      countdownStartTimeRef.current = 0;
       return;
     }
-    if (FIT_CONFIG.countdownSeconds > 0) {
-      setCountdown(FIT_CONFIG.countdownSeconds);
-    } else {
-      executeCapture();
+    countdownStartTimeRef.current = performance.now();
+    setCountdown(RULES.capture.countdownSeconds);
+  };
+
+  const handleCaptureAnyway = () => {
+    if (!hasCameraStream || isCapturing) return;
+    setCountdown(null);
+    const attemptEntry = {
+      timestamp: new Date().toISOString(),
+      view: activeCameraView,
+      passed: false,
+      usedGrace: false,
+      captureAnyway: true,
+      secondsToGreen: null,
+      failingParts: Object.entries(poseParts || {})
+        .filter(([_, v]: any) => v?.state === 'bad')
+        .map(([k]) => k),
+      metrics: poseMetrics
+        ? {
+            leftArmAngle: Math.round(poseMetrics.leftArmAngle),
+            rightArmAngle: Math.round(poseMetrics.rightArmAngle),
+            spread: Math.round((poseMetrics.spread || 0) * 100) / 100,
+          }
+        : null,
+    };
+    setAttemptLog((prev) => [attemptEntry, ...prev]);
+    executeCapture(true);
+  };
+
+  const handleToggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    setAudioMuted(next);
+    showNotification(next ? 'Muted voice cues' : 'Unmuted voice cues');
+  };
+
+  const handleCopyAttemptLog = () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(JSON.stringify(attemptLog, null, 2));
+        setCopiedLog(true);
+        setTimeout(() => setCopiedLog(false), 2000);
+        showNotification('Copied attempt log');
+      }
+    } catch {
+      showNotification('Unable to copy log');
     }
   };
 
@@ -608,7 +598,11 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
 
           <button
             type="button"
-            onClick={() => dispatch(goToStepAction('hub'))}
+            onClick={() => {
+              unlockAudio();
+              requestTiltPermission();
+              dispatch(goToStepAction('hub'));
+            }}
             className="w-full mt-6 h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm tracking-wide transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>I'm ready</span>
@@ -729,12 +723,19 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
               {session.front && (
                 <div
                   className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${
-                    isFrontValid
+                    session.front.verified === false
+                      ? 'bg-amber-500/15 text-amber-500 border border-amber-500/25'
+                      : isFrontValid
                       ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25'
                       : 'bg-destructive/15 text-destructive border border-destructive/25'
                   }`}
                 >
-                  {isFrontValid ? (
+                  {session.front.verified === false ? (
+                    <>
+                      <AlertCircle className="w-3 h-3 stroke-[2.5]" />
+                      <span>Not verified</span>
+                    </>
+                  ) : isFrontValid ? (
                     <>
                       <Check className="w-3 h-3 stroke-[3]" />
                       <span>Looks good</span>
@@ -763,7 +764,11 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
                 <div className="flex items-center gap-2.5 mt-4 w-full max-w-xs">
                   <button
                     type="button"
-                    onClick={() => dispatch(startCameraAction('front'))}
+                    onClick={() => {
+                      unlockAudio();
+                      requestTiltPermission();
+                      dispatch(startCameraAction('front'));
+                    }}
                     className="flex-1 h-10 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
                   >
                     <Camera className="w-3.5 h-3.5" />
@@ -791,7 +796,11 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
                 <div className="flex items-center gap-2 w-full">
                   <button
                     type="button"
-                    onClick={() => dispatch(startCameraAction('front'))}
+                    onClick={() => {
+                      unlockAudio();
+                      requestTiltPermission();
+                      dispatch(startCameraAction('front'));
+                    }}
                     className="flex-1 h-9 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
@@ -827,12 +836,19 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
               {session.side && (
                 <div
                   className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${
-                    isSideValid
+                    session.side.verified === false
+                      ? 'bg-amber-500/15 text-amber-500 border border-amber-500/25'
+                      : isSideValid
                       ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25'
                       : 'bg-destructive/15 text-destructive border border-destructive/25'
                   }`}
                 >
-                  {isSideValid ? (
+                  {session.side.verified === false ? (
+                    <>
+                      <AlertCircle className="w-3 h-3 stroke-[2.5]" />
+                      <span>Not verified</span>
+                    </>
+                  ) : isSideValid ? (
                     <>
                       <Check className="w-3 h-3 stroke-[3]" />
                       <span>Looks good</span>
@@ -861,7 +877,11 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
                 <div className="flex items-center gap-2.5 mt-4 w-full max-w-xs">
                   <button
                     type="button"
-                    onClick={() => dispatch(startCameraAction('side'))}
+                    onClick={() => {
+                      unlockAudio();
+                      requestTiltPermission();
+                      dispatch(startCameraAction('side'));
+                    }}
                     className="flex-1 h-10 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
                   >
                     <Camera className="w-3.5 h-3.5" />
@@ -889,7 +909,11 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
                 <div className="flex items-center gap-2 w-full">
                   <button
                     type="button"
-                    onClick={() => dispatch(startCameraAction('side'))}
+                    onClick={() => {
+                      unlockAudio();
+                      requestTiltPermission();
+                      dispatch(startCameraAction('side'));
+                    }}
                     className="flex-1 h-9 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
@@ -935,7 +959,6 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
   // ==========================================
   if (session.step === 'camera') {
     const isPersonInView = personVisible && !isPoseValid;
-    const currentGuideState = guideState({ personVisible, isValid: isPoseValid });
 
     const frameOutlineClass = isPoseValid
       ? 'outline outline-4 outline-[#22c55e] -outline-offset-4 shadow-[inset_0_0_24px_rgba(34,197,94,0.35)]'
@@ -979,14 +1002,6 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
           className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none"
         />
 
-        {/* Fixed Silhouette Guide */}
-        <PoseGuideOverlay
-          state={currentGuideState}
-          viewMode={activeCameraView}
-          containerRef={cameraContainerRef}
-          videoRef={videoRef}
-        />
-
         {notification && (
           <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-card/90 backdrop-blur-md border border-border px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2 animate-fade-in text-xs font-medium text-foreground">
             <Check className="w-3.5 h-3.5 text-primary" />
@@ -1009,18 +1024,34 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
             <span>{viewTitle}</span>
           </div>
 
-          <button
-            type="button"
-            onClick={handleToggleFlash}
-            className={`w-11 h-11 rounded-full backdrop-blur-md border flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 ${
-              isFlashOn
-                ? 'bg-primary text-primary-foreground border-primary shadow-primary/30'
-                : 'bg-card/80 text-primary border-border hover:bg-card'
-            }`}
-            aria-label={isFlashOn ? 'Turn off flash' : 'Turn on flash'}
-          >
-            {isFlashOn ? <Zap className="w-5 h-5 fill-current" /> : <ZapOff className="w-5 h-5 stroke-[2]" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              className={`w-11 h-11 rounded-full backdrop-blur-md border flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 ${
+                isMuted
+                  ? 'bg-destructive/15 text-destructive border-destructive/25'
+                  : 'bg-card/80 text-foreground border-border hover:bg-card'
+              }`}
+              aria-label={isMuted ? 'Unmute voice cues' : 'Mute voice cues'}
+              title={isMuted ? 'Unmute voice cues' : 'Mute voice cues'}
+            >
+              {isMuted ? <VolumeX className="w-5 h-5 stroke-[2]" /> : <Volume2 className="w-5 h-5 stroke-[2]" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleFlash}
+              className={`w-11 h-11 rounded-full backdrop-blur-md border flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 ${
+                isFlashOn
+                  ? 'bg-primary text-primary-foreground border-primary shadow-primary/30'
+                  : 'bg-card/80 text-primary border-border hover:bg-card'
+              }`}
+              aria-label={isFlashOn ? 'Turn off flash' : 'Turn on flash'}
+            >
+              {isFlashOn ? <Zap className="w-5 h-5 fill-current" /> : <ZapOff className="w-5 h-5 stroke-[2]" />}
+            </button>
+          </div>
         </header>
 
         {/* Short Instruction Banner */}
@@ -1095,6 +1126,20 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
 
         {/* Shutter Bar */}
         <footer className="w-full rounded-t-[32px] bg-card border-t border-border px-8 pt-5 pb-8 flex items-center justify-between shadow-2xl z-30 relative">
+          {/* Secondary 'Capture anyway' button after 3 failed attempts */}
+          {failedAttempts >= RULES.capture.failsBeforeAnyway && (
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-40">
+              <button
+                type="button"
+                onClick={handleCaptureAnyway}
+                className="px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 animate-fade-in"
+              >
+                <AlertCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Capture anyway</span>
+              </button>
+            </div>
+          )}
+
           <div className="w-14 flex items-center justify-start">
             <button
               type="button"
@@ -1132,93 +1177,76 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
             </div>
           </div>
         </footer>
+
         {/* Debug UI (only rendered if isDebugPose is true) */}
         {isDebugPose && (
-          <>
-            <div className="absolute top-16 right-4 z-40 max-w-[220px] bg-black/80 backdrop-blur-md text-[10px] text-white p-3 rounded-xl border border-white/20 font-mono shadow-xl space-y-1 select-text pointer-events-auto">
-              <div className="font-bold text-xs text-primary mb-1 flex items-center justify-between">
-                <span>POSE DEBUG</span>
-                <span className={isPoseValid ? 'text-emerald-400' : 'text-amber-400'}>
-                  {isPoseValid ? 'PASS' : 'FAIL'}
-                </span>
-              </div>
-              <div>Video: {videoRef.current ? `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}` : 'N/A'}</div>
-              <div>Box: {cameraContainerRef.current ? `${cameraContainerRef.current.clientWidth}x${cameraContainerRef.current.clientHeight}` : 'N/A'}</div>
-              {fitResult && (
-                <>
-                  <div>Ratio: {fitResult.ratio ?? 'N/A'} (target ~1.0)</div>
-                  <div>Center: dx={fitResult.dx ?? 0}px, dy={fitResult.dy ?? 0}px</div>
-                  <div>
-                    State: {fitResult.pass ? 'PASS' : 'FAIL'} {fitResult.scalePass ? '✓scale' : '✗scale'} {fitResult.centerPass ? '✓cntr' : '✗cntr'}
-                  </div>
-                  {fitResult.worstJoint && (
-                    <div>
-                      Worst: {fitResult.worstJoint.name} ({Math.round(fitResult.worstJoint.dist)}px / {Math.round(fitResult.worstJoint.maxDist)}px)
-                    </div>
-                  )}
-                  {fitResult.missedJoints && fitResult.missedJoints.length > 0 && (
-                    <div className="text-red-300">
-                      Missed: {fitResult.missedJoints.join(', ')}
-                    </div>
-                  )}
-                </>
-              )}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRecordedFrames([]);
-                    setIsRecordingPose(true);
-                  }}
-                  disabled={isRecordingPose}
-                  className="w-full py-1 px-2 rounded bg-primary/80 hover:bg-primary text-white text-[10px] font-semibold tracking-wide disabled:opacity-50 cursor-pointer"
-                >
-                  {isRecordingPose ? `Recording (${recordedFrames.length}/30)...` : 'Record Pose (30f)'}
-                </button>
-              </div>
+          <div className="absolute top-16 right-4 z-40 max-w-[280px] max-h-[75vh] overflow-y-auto bg-black/85 backdrop-blur-md text-[10px] text-white p-3 rounded-2xl border border-white/20 font-mono shadow-2xl space-y-2 select-text pointer-events-auto">
+            <div className="font-bold text-xs text-primary pb-1 border-b border-white/10 flex items-center justify-between">
+              <span>POSE DEBUG</span>
+              <span className={isPoseValid ? 'text-emerald-400 font-black' : 'text-amber-400 font-black'}>
+                {isPoseValid ? 'PASS' : 'FAIL'}
+              </span>
             </div>
 
-            {/* Recorded Pose Modal */}
-            {recordedPoseJson && (
-              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
-                <div className="w-full max-w-sm max-h-[80vh] flex flex-col bg-card border border-border rounded-2xl p-4 shadow-2xl text-foreground">
-                  <div className="flex items-center justify-between pb-2 border-b border-border">
-                    <h3 className="font-bold text-sm">Recorded Pose (Artwork Coords)</h3>
-                    <button
-                      type="button"
-                      onClick={() => setRecordedPoseJson(null)}
-                      className="text-muted-foreground hover:text-foreground cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <pre className="flex-1 my-3 p-2 bg-secondary/50 rounded-lg text-[10px] font-mono overflow-auto select-all text-foreground">
-                    {recordedPoseJson}
-                  </pre>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(recordedPoseJson);
-                        setCopiedJson(true);
-                        setTimeout(() => setCopiedJson(false), 2000);
-                      }}
-                      className="flex-1 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold cursor-pointer"
-                    >
-                      {copiedJson ? 'Copied!' : 'Copy JSON'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRecordedPoseJson(null)}
-                      className="px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-xs cursor-pointer"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
+            {/* Tilt Readout */}
+            <div className="space-y-0.5">
+              <div className="text-[10px] font-bold text-white/80">Tilt ({poseTilt?.state || 'N/A'})</div>
+              <div>Pitch: {Math.round(poseTilt?.pitch ?? 0)}° [{RULES.tilt.pitch.min}..{RULES.tilt.pitch.max}]</div>
+              <div>Roll: {Math.round(poseTilt?.roll ?? 0)}° [{RULES.tilt.roll.min}..{RULES.tilt.roll.max}]</div>
+              <div>Shake: {Math.round((poseTilt?.shakeRate ?? 0) * 10) / 10}°/s (max: {RULES.tilt.shakeDegPerSec})</div>
+            </div>
+
+            {/* Whole-body Readout */}
+            {poseMetrics && (
+              <div className="space-y-0.5 border-t border-white/10 pt-1">
+                <div className="text-[10px] font-bold text-white/80">Whole Body</div>
+                <div>Height: {Math.round((poseMetrics.heightFrac || 0) * 100)}% [{RULES.body.heightFracMin * 100}..{RULES.body.heightFracMax * 100}%]</div>
+                <div>Offset: {Math.round((poseMetrics.centerOffset || 0) * 100)}% [max {RULES.body.centerOffsetMax * 100}%]</div>
               </div>
             )}
-          </>
+
+            {/* Parts Readout */}
+            {poseMetrics && (
+              <div className="space-y-0.5 border-t border-white/10 pt-1">
+                <div className="text-[10px] font-bold text-white/80">Parts</div>
+                <div>L Arm: {Math.round(poseMetrics.leftArmAngle)}° [{RULES.arm.angle.min}..{RULES.arm.angle.max}] {poseParts?.leftArm?.state === 'ok' ? '✓' : '✗'}</div>
+                <div>R Arm: {Math.round(poseMetrics.rightArmAngle)}° [{RULES.arm.angle.min}..{RULES.arm.angle.max}] {poseParts?.rightArm?.state === 'ok' ? '✓' : '✗'}</div>
+                <div>Spread: {Math.round((poseMetrics.spread || 0) * 100) / 100} [{RULES.leg.spread.min}..{RULES.leg.spread.max}] {poseParts?.leftLeg?.state === 'ok' ? '✓' : '✗'}</div>
+                <div>Sh Tilt: {Math.round(poseMetrics.shoulderTilt)}° [{RULES.shoulders.tilt.min}..{RULES.shoulders.tilt.max}] {poseParts?.shoulders?.state === 'ok' ? '✓' : '✗'}</div>
+                <div>Torso Lean: {Math.round(poseMetrics.torsoLean)}° [{RULES.torso.lean.min}..{RULES.torso.lean.max}] {poseParts?.torso?.state === 'ok' ? '✓' : '✗'}</div>
+              </div>
+            )}
+
+            {/* Attempt Log */}
+            <div className="border-t border-white/10 pt-1 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[10px] text-white/80">Attempts ({attemptLog.length})</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleCopyAttemptLog}
+                    className="px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[9px] hover:bg-primary/90 cursor-pointer"
+                  >
+                    {copiedLog ? 'Copied!' : 'Copy log'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttemptLog([])}
+                    className="px-1.5 py-0.5 rounded bg-white/20 text-white text-[9px] hover:bg-white/30 cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              {attemptLog.slice(0, 3).map((item, idx) => (
+                <div key={idx} className="p-1 rounded bg-white/5 text-[9px] leading-tight">
+                  <div>{new Date(item.timestamp).toLocaleTimeString()} - {item.passed ? 'PASS' : item.captureAnyway ? 'ANYWAY' : 'FAIL'}</div>
+                  {item.secondsToGreen && <div>To Green: {item.secondsToGreen}s</div>}
+                  {item.failingParts?.length > 0 && <div>Failing: {item.failingParts.join(', ')}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     );

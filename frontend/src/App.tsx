@@ -68,7 +68,7 @@ export function App() {
 
   const isAuthed = !!session;
   const hasCompletedOnboarding = !!profile?.onboarding_completed;
-  const isAppLoading = loading || (isAuthed && profileLoading);
+  const isAppLoading = loading || (isAuthed && !profile && profileLoading);
 
   // Single central decision point based on Section 5 routing table:
   // - Loading: show app loading screen (no login/onboarding flash)

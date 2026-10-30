@@ -1,28 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { getPoseLandmarker } from "../../services/poseLandmarker.js";
-import { THRESHOLDS as T, COLORS, GUIDE, FIT_CONFIG, IDX } from "./poseConstants.js";
-import { placeGuide, drawSkeletonOverlay } from "./poseGuide.js";
-import { fitToGuide, createHoldTracker, smoothJoints } from "./fitToGuide.js";
-
-const JOINT_NAMES = [
-  "nose",
-  "leftShoulder", "rightShoulder",
-  "leftElbow", "rightElbow",
-  "leftWrist", "rightWrist",
-  "leftHip", "rightHip",
-  "leftKnee", "rightKnee",
-  "leftAnkle", "rightAnkle",
-];
+import { THRESHOLDS as T, COLORS } from "./poseConstants.js";
+import { RULES, createHoldTracker, smoothJoints } from "./poseRules.js";
+import { evaluatePose } from "./evaluatePose.js";
+import { useDeviceTilt } from "./useDeviceTilt.js";
+import { drawLimbsOverlay } from "./limbRenderer.js";
+import { playChime, playDistanceCue, cueDecision, cueFromHint } from "./cues.js";
 
 /**
- * Hook for live pose validation using the fit-to-guide rule.
+ * Hook for live pose validation using per-body-part evaluation and tilt gating.
  *
- * Runs MediaPipe on every frame, maps landmarks to screen space,
- * compares against the silhouette guide's joint targets, and exposes
- * { isValid, hint, isReady, error, personVisible, lastValidAtMs, fitResult }.
- *
- * The old validator prop is kept for the side view (which still uses validateSidePose).
- * For the front view, fitToGuide is used instead.
+ * Runs MediaPipe on every frame, tracks phone tilt, evaluates each limb against
+ * individual pass ranges using the person's own proportions, renders color-coded
+ * lines to the canvas, and manages distance cues and countdown validation.
  */
 export function usePoseValidation({
   videoRef,
@@ -32,6 +22,8 @@ export function usePoseValidation({
   validator,
   showSkeleton = false,
   viewMode = "front",
+  mirrored = false,
+  isCountdownActive = false,
 }) {
   const [isValid, setIsValid] = useState(false);
   const [hint, setHint] = useState("Getting ready...");
@@ -39,7 +31,10 @@ export function usePoseValidation({
   const [error, setError] = useState(null);
   const [personVisible, setPersonVisible] = useState(false);
   const [lastValidAtMs, setLastValidAtMs] = useState(0);
-  const [fitResult, setFitResult] = useState(null);
+  const [parts, setParts] = useState({});
+  const [metrics, setMetrics] = useState(null);
+
+  const tilt = useDeviceTilt({ enabled });
 
   const validatorRef = useRef(validator);
   useEffect(() => {
@@ -54,23 +49,39 @@ export function usePoseValidation({
   const lastDetectionTimeRef = useRef(0);
   const lastVideoTimeRef = useRef(-1);
   const smoothedJointsRef = useRef(null);
-  const holdTrackerRef = useRef(createHoldTracker({
-    passHoldMs: FIT_CONFIG.passHoldMs,
-    failHoldMs: FIT_CONFIG.failHoldMs,
-  }));
+  const prevPoseEvalRef = useRef(null);
+  const lastCueRef = useRef(null);
+  const lastCueTimeRef = useRef(0);
 
-  // Reset hold tracker when viewMode changes
+  const holdTrackerRef = useRef(
+    createHoldTracker({
+      passHoldMs: RULES.hold.passMs,
+      failHoldMs: RULES.hold.failMs,
+    })
+  );
+
+  // Reset trackers and smoothing when viewMode changes
   useEffect(() => {
     holdTrackerRef.current.reset();
     smoothedJointsRef.current = null;
+    prevPoseEvalRef.current = null;
+    lastCueRef.current = null;
+    lastCueTimeRef.current = 0;
     setIsValid(false);
     currentValidRef.current = false;
     setPersonVisible(false);
     personVisibleRef.current = false;
+    setParts({});
+    setMetrics(null);
   }, [viewMode]);
 
-  const updateValidState = (nextValid) => {
+  const updateValidState = (nextValid, now) => {
     if (currentValidRef.current !== nextValid) {
+      if (!currentValidRef.current && nextValid) {
+        // Transition from invalid -> valid: play chime!
+        playChime();
+        setLastValidAtMs(now);
+      }
       currentValidRef.current = nextValid;
       setIsValid(nextValid);
     }
@@ -112,7 +123,9 @@ export function usePoseValidation({
     }
 
     init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [enabled]);
 
   // 2. Main detection loop
@@ -156,131 +169,190 @@ export function usePoseValidation({
 
         try {
           const result = landmarker.detectForVideo(video, now);
-          const landmarks = result?.landmarks?.[0] || null;
+          const rawLandmarks = result?.landmarks?.[0] || null;
 
-          if (showSkeleton && canvas) {
-            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
+          const videoW = video.videoWidth || 720;
+          const videoH = video.videoHeight || 1280;
+
+          if (canvas) {
+            if (canvas.width !== videoW || canvas.height !== videoH) {
+              canvas.width = videoW;
+              canvas.height = videoH;
             }
           }
 
-          if (!landmarks || landmarks.length === 0) {
-            // No person
+          if (!rawLandmarks || rawLandmarks.length === 0) {
+            // No person in camera view
             updatePersonVisibleState(false);
-            if (showSkeleton) clearCanvas();
+            clearCanvas();
             const holderValid = holdTrackerRef.current.update(false, now);
-            updateValidState(holderValid);
-            updateHintState("Step into the camera view");
+            updateValidState(holderValid, now);
+
+            // Hint: tilt takes precedence if tilted, else step into view
+            const noPersonHint = !tilt.ok ? tilt.hint : "Step into the camera view";
+            updateHintState(noPersonHint);
+
             smoothedJointsRef.current = null;
+            setParts({});
+            setMetrics(null);
           } else {
             updatePersonVisibleState(true);
 
             if (viewMode === "front") {
-              // Fit-to-guide for front view
-              const container = containerRef?.current;
-              const boxW = container?.clientWidth || video.videoWidth;
-              const boxH = container?.clientHeight || video.videoHeight;
-              const videoW = video.videoWidth;
-              const videoH = video.videoHeight;
-
-              if (showSkeleton && canvas) {
-                if (canvas.width !== boxW || canvas.height !== boxH) {
-                  canvas.width = boxW;
-                  canvas.height = boxH;
-                }
-              }
-
-              const placement = placeGuide({ videoW, videoH, boxW, boxH, fit: "cover" });
-
-              // Extract raw joint positions in box pixels for smoothing
-              const cs = placement.cs;
-              const rawJoints = {};
-              for (const name of JOINT_NAMES) {
-                const idx = IDX[name];
-                const lm = landmarks[idx];
-                if (!lm) continue;
-                let bx = boxW / 2 + (lm.x - 0.5) * videoW * cs;
-                const by = boxH / 2 + (lm.y - 0.5) * videoH * cs;
-                rawJoints[name] = { x: bx, y: by, visibility: lm.visibility ?? 0 };
-              }
-
-              // Smooth
+              // Smooth landmarks exponentially
               smoothedJointsRef.current = smoothJoints(
                 smoothedJointsRef.current,
-                rawJoints,
-                FIT_CONFIG.smoothingAlpha
+                rawLandmarks,
+                RULES.smoothingAlpha
               );
+              const smoothedLandmarks = smoothedJointsRef.current || rawLandmarks;
 
-              // Build smoothed landmarks array for fitToGuide (put smoothed back into normalized)
-              const smoothedLandmarks = [...landmarks];
-              for (const name of JOINT_NAMES) {
-                const idx = IDX[name];
-                const sj = smoothedJointsRef.current[name];
-                if (sj) {
-                  const u = 0.5 + (sj.x - boxW / 2) / (videoW * cs);
-                  const v = 0.5 + (sj.y - boxH / 2) / (videoH * cs);
-                  smoothedLandmarks[idx] = {
-                    ...landmarks[idx],
-                    x: u,
-                    y: v,
-                  };
-                }
-              }
-
-              const fit = fitToGuide({
+              // Run pure pose evaluation
+              const poseEval = evaluatePose({
                 landmarks: smoothedLandmarks,
-                placement,
                 videoW,
                 videoH,
-                boxW,
-                boxH,
-                fit: "cover",
-                mirrored: false,
-                guide: GUIDE,
+                mirrored,
+                prev: prevPoseEvalRef.current,
+                rangeScale: 1,
               });
 
-              setFitResult(fit);
+              prevPoseEvalRef.current = poseEval.nextPrev;
+              setMetrics(poseEval.metrics);
 
-              const holderValid = holdTrackerRef.current.update(fit.pass, now);
-              updateValidState(holderValid);
-              if (holderValid) {
-                setLastValidAtMs(now);
-              }
-              updateHintState(holderValid ? "Perfect, hold still" : fit.hint);
+              // Tilt gating: tilt beats whole-body, which beats parts
+              let effectivePass = false;
+              let effectiveHint = "Step into the camera view";
+              let displayedParts = poseEval.parts;
 
-              // Draw debug skeleton overlay
-              if (showSkeleton && canvas) {
-                const color = currentValidRef.current ? COLORS.valid : COLORS.invalid;
-                drawSkeletonOverlay(canvas, landmarks, { color, showSkeleton: true, fitResult: fit });
+              if (!tilt.ok) {
+                // Tilt gates the pose: limbs neutral, green cannot show, tilt message displayed
+                effectivePass = false;
+                effectiveHint = tilt.hint;
+                displayedParts = Object.fromEntries(
+                  Object.entries(poseEval.parts).map(([k, v]) => [
+                    k,
+                    { ...v, state: "neutral" },
+                  ])
+                );
+              } else {
+                effectivePass = poseEval.pass;
+                effectiveHint = poseEval.hint;
+                displayedParts = poseEval.parts;
               }
-            } else {
-              // Side view: use the old validator
-              if (showSkeleton && canvas) {
-                if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-                  canvas.width = video.videoWidth;
-                  canvas.height = video.videoHeight;
+
+              setParts(displayedParts);
+
+              // Update hold tracker (300ms continuous pass -> green)
+              const holderValid = holdTrackerRef.current.update(effectivePass, now);
+              updateValidState(holderValid, now);
+
+              const activeDisplayHint = holderValid ? "Perfect, hold still" : effectiveHint;
+              updateHintState(activeDisplayHint);
+
+              // Audio distance cues (only when not in countdown and not valid)
+              if (!isCountdownActive && !holderValid && tilt.ok) {
+                const cue = cueFromHint(effectiveHint);
+                if (
+                  cue &&
+                  cueDecision({
+                    cue,
+                    lastCue: lastCueRef.current,
+                    lastPlayedAtMs: lastCueTimeRef.current,
+                    nowMs: now,
+                  })
+                ) {
+                  playDistanceCue(cue);
+                  lastCueRef.current = cue;
+                  lastCueTimeRef.current = now;
                 }
               }
 
-              const currentValidator = validatorRef.current;
-              if (currentValidator) {
-                const validation = currentValidator(landmarks, {
-                  width: video.videoWidth,
-                  height: video.videoHeight,
+              // Draw color-coded limbs overlay
+              if (canvas) {
+                drawLimbsOverlay(canvas, {
+                  landmarks: smoothedLandmarks,
+                  parts: displayedParts,
+                  metrics: poseEval.metrics,
+                  videoW,
+                  videoH,
+                  wholeBodyOk: poseEval.wholeBody.ok,
+                  tiltOk: tilt.ok,
+                  showSkeleton,
+                  showTargetHints: RULES.SHOW_TARGET_HINTS,
                 });
+              }
+            } else {
+              // Side view: legacy validator + tilt gating
+              const currentValidator = validatorRef.current;
+              let sideValid = false;
+              let sideReason = "Step into the camera view";
 
-                const holderValid = holdTrackerRef.current.update(validation.valid, now);
-                updateValidState(holderValid);
-                if (holderValid) setLastValidAtMs(now);
-                const reason = validation.reasons?.[0] || "Step into the camera view";
-                updateHintState(holderValid ? "Perfect, hold still" : reason);
+              if (currentValidator) {
+                const validation = currentValidator(rawLandmarks, {
+                  width: videoW,
+                  height: videoH,
+                });
+                sideValid = validation.valid;
+                sideReason = validation.reasons?.[0] || "Step into the camera view";
               }
 
-              // Draw skeleton overlay only in debug mode
-              if (showSkeleton && canvas) {
-                const color = currentValidRef.current ? COLORS.valid : COLORS.invalid;
-                drawSkeletonOverlay(canvas, landmarks, { color, showSkeleton: true });
+              let effectiveSidePass = false;
+              let effectiveSideHint = sideReason;
+
+              if (!tilt.ok) {
+                effectiveSidePass = false;
+                effectiveSideHint = tilt.hint;
+              } else {
+                effectiveSidePass = sideValid;
+                effectiveSideHint = sideReason;
+              }
+
+              const holderValid = holdTrackerRef.current.update(effectiveSidePass, now);
+              updateValidState(holderValid, now);
+
+              const activeSideDisplayHint = holderValid ? "Perfect, hold still" : effectiveSideHint;
+              updateHintState(activeSideDisplayHint);
+
+              // Audio distance cues for side view
+              if (!isCountdownActive && !holderValid && tilt.ok) {
+                const cue = cueFromHint(effectiveSideHint);
+                if (
+                  cue &&
+                  cueDecision({
+                    cue,
+                    lastCue: lastCueRef.current,
+                    lastPlayedAtMs: lastCueTimeRef.current,
+                    nowMs: now,
+                  })
+                ) {
+                  playDistanceCue(cue);
+                  lastCueRef.current = cue;
+                  lastCueTimeRef.current = now;
+                }
+              }
+
+              // Clear or draw skeleton
+              if (canvas) {
+                clearCanvas();
+                if (showSkeleton) {
+                  const ctx = canvas.getContext("2d");
+                  if (ctx) {
+                    ctx.save();
+                    ctx.strokeStyle = holderValid ? COLORS.valid : COLORS.invalid;
+                    ctx.lineWidth = 2;
+                    // Simple skeleton connection for side view
+                    ctx.beginPath();
+                    for (let i = 0; i < rawLandmarks.length; i++) {
+                      const lm = rawLandmarks[i];
+                      if ((lm.visibility ?? 0) > 0.4) {
+                        ctx.arc(lm.x * videoW, lm.y * videoH, 3, 0, Math.PI * 2);
+                      }
+                    }
+                    ctx.stroke();
+                    ctx.restore();
+                  }
+                }
               }
             }
           }
@@ -300,12 +372,34 @@ export function usePoseValidation({
         cancelAnimationFrame(animFrameIdRef.current);
         animFrameIdRef.current = null;
       }
-      if (showSkeleton) clearCanvas();
+      clearCanvas();
       updatePersonVisibleState(false);
     };
-  }, [enabled, isReady, videoRef, canvasRef, containerRef, showSkeleton, viewMode]);
+  }, [
+    enabled,
+    isReady,
+    videoRef,
+    canvasRef,
+    containerRef,
+    showSkeleton,
+    viewMode,
+    mirrored,
+    tilt.ok,
+    tilt.hint,
+    isCountdownActive,
+  ]);
 
-  return { isValid, hint, isReady, error, personVisible, lastValidAtMs, fitResult };
+  return {
+    isValid,
+    hint,
+    isReady,
+    error,
+    personVisible,
+    lastValidAtMs,
+    parts,
+    metrics,
+    tilt,
+  };
 }
 
 export default usePoseValidation;

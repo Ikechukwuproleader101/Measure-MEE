@@ -1,5 +1,4 @@
 import React from 'react';
-import type { FitToGuideResult } from './fitToGuide';
 
 export type PoseValidator = (
   landmarks: Array<{ x: number; y: number; z: number; visibility?: number }>,
@@ -15,6 +14,7 @@ export interface UsePoseValidationOptions {
   showSkeleton?: boolean;
   viewMode?: 'front' | 'side';
   mirrored?: boolean;
+  isCountdownActive?: boolean;
 }
 
 export interface UsePoseValidationResult {
@@ -24,7 +24,18 @@ export interface UsePoseValidationResult {
   error: string | null;
   personVisible: boolean;
   lastValidAtMs: number;
-  fitResult: FitToGuideResult | null;
+  parts: Record<string, { state: 'ok' | 'bad' | 'unseen' | 'neutral' }>;
+  metrics: any;
+  tilt: {
+    ok: boolean;
+    state: string;
+    hint: string | null;
+    pitch: number;
+    roll: number;
+    shakeRate: number;
+    hasData: boolean;
+  };
+  fitResult?: any;
 }
 
 export declare function usePoseValidation(
