@@ -42,6 +42,9 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
+  const isCountingDownRef = useRef(false);
+  const countdownTimerRef = useRef(null);
+  const executeCaptureRef = useRef(null);
 
   const [isCameraPlaying, setIsCameraPlaying] = useState(false);
   const [restartKey, setRestartKey] = useState(0);
@@ -263,19 +266,49 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
     });
   };
 
-  // Countdown timer effect
+  executeCaptureRef.current = executeCapture;
+
+  // Countdown timer cleanup
   useEffect(() => {
-    if (countdown === null) return;
-    if (countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown((c) => (c !== null ? c - 1 : null));
-      }, 700);
-      return () => clearTimeout(timer);
-    } else {
-      setCountdown(null);
-      executeCapture();
+    return () => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      isCountingDownRef.current = false;
+    };
+  }, []);
+
+  const handleManualShutter = () => {
+    if (isCountingDownRef.current || holdingState.isHolding) return;
+    isCountingDownRef.current = true;
+
+    let remaining = 3;
+    setCountdown(remaining);
+
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
     }
-  }, [countdown]);
+
+    countdownTimerRef.current = setInterval(() => {
+      remaining -= 1;
+
+      if (remaining > 0) {
+        setCountdown(remaining);
+        return;
+      }
+
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      setCountdown(null);
+      isCountingDownRef.current = false;
+
+      executeCaptureRef.current?.();
+    }, 1000);
+  };
 
   // 3. User Actions on Held Image (Retake vs Accept)
   const handleRetakeHeldImage = () => {
@@ -541,7 +574,7 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
             <div className="flex-1 flex justify-center">
               <button
                 type="button"
-                onClick={() => setCountdown(3)}
+                onClick={handleManualShutter}
                 disabled={countdown !== null}
                 className={`w-20 h-20 rounded-full border-4 p-1.5 flex items-center justify-center active:scale-95 transition-all cursor-pointer group shadow-lg ${
                   isPoseValid

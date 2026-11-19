@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RULES, rangeCheck, createHoldTracker, shouldCaptureAtZero, smoothJoints } from './poseRules.js';
+import { RULES, rangeCheck, createHoldTracker, shouldCaptureAtZero } from './poseRules.js';
 import { calculateBodyMetrics } from './bodyMetrics.js';
 import { evaluatePose } from './evaluatePose.js';
 import { evaluateTilt } from './tilt.js';

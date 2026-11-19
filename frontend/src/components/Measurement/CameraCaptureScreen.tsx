@@ -22,7 +22,7 @@ import {
 import { usePoseValidation } from '../../features/capture/usePoseValidation';
 import { validateAPose } from '../../features/capture/validateAPose';
 import { validateSidePose } from '../../features/capture/validateSidePose';
-import { RULES, AUTO_START_WHEN_GREEN, shouldCaptureAtZero } from '../../features/capture/poseRules';
+import { RULES, shouldCaptureAtZero } from '../../features/capture/poseRules';
 import { evaluatePose } from '../../features/capture/evaluatePose';
 import { requestTiltPermission } from '../../features/capture/useDeviceTilt';
 import { unlockAudio, isAudioMuted, setAudioMuted } from '../../features/capture/cues';
@@ -94,10 +94,10 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
   const [isMuted, setIsMuted] = useState(isAudioMuted);
   const countdownStartTimeRef = useRef(0);
 
-  // Reset failure count when camera view changes
-  useEffect(() => {
-    setFailedAttempts(0);
-  }, [activeCameraView]);
+  // Countdown lock, interval timer, and mode refs
+  const isCountingDownRef = useRef(false);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isCaptureAnywayRef = useRef(false);
 
   // Real-time on-device MediaPipe Pose detection (only active during camera step)
   const {
@@ -249,6 +249,7 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
       });
 
       if ('error' in result) {
+        setFailedAttempts((prev) => prev + 1);
         showNotification(result.error);
         setIsCapturing(false);
       } else {
@@ -261,108 +262,160 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
     [activeCameraView, activeValidator, facingMode, isCapturing]
   );
 
-  // Optional auto-start when green (configured by AUTO_START_WHEN_GREEN)
+  // Synchronize latest values to refs to avoid stale closures in interval
+  const isPoseValidRef = useRef(isPoseValid);
+  const lastValidAtMsRef = useRef(lastValidAtMs);
+  const posePartsRef = useRef(poseParts);
+  const poseMetricsRef = useRef(poseMetrics);
+  const activeCameraViewRef = useRef(activeCameraView);
+  const executeCaptureRef = useRef(executeCapture);
+
   useEffect(() => {
-    if (!isCameraActive || isCapturing || !AUTO_START_WHEN_GREEN) return;
+    isPoseValidRef.current = isPoseValid;
+    lastValidAtMsRef.current = lastValidAtMs;
+    posePartsRef.current = poseParts;
+    poseMetricsRef.current = poseMetrics;
+    activeCameraViewRef.current = activeCameraView;
+  }, [isPoseValid, lastValidAtMs, poseParts, poseMetrics, activeCameraView]);
 
-    if (isPoseValid && countdown === null) {
-      countdownStartTimeRef.current = performance.now();
-      setCountdown(RULES.capture.countdownSeconds);
-    }
-  }, [isCameraActive, isPoseValid, isCapturing, countdown]);
-
-  // Countdown timer (3 -> 2 -> 1 -> check at 0)
   useEffect(() => {
-    if (countdown === null) return;
+    executeCaptureRef.current = executeCapture;
+  }, [executeCapture]);
 
-    if (countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown((c) => (c !== null && c > 0 ? c - 1 : null));
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (countdown === 0) {
-      setCountdown(null);
-      const now = performance.now();
-      const canCapture = shouldCaptureAtZero({
-        isValid: isPoseValid,
-        lastValidAtMs,
-        nowMs: now,
-        graceMs: RULES.capture.graceMs,
-      });
-
-      const usedGrace = !isPoseValid && canCapture;
-
-      // Log attempt
-      const attemptEntry = {
-        timestamp: new Date().toISOString(),
-        view: activeCameraView,
-        passed: canCapture,
-        usedGrace,
-        captureAnyway: false,
-        secondsToGreen:
-          countdownStartTimeRef.current && lastValidAtMs > countdownStartTimeRef.current
-            ? Math.round((lastValidAtMs - countdownStartTimeRef.current) / 100) / 10
-            : null,
-        failingParts: Object.entries(poseParts || {})
-          .filter(([_, v]: any) => v?.state === 'bad')
-          .map(([k]) => k),
-        metrics: poseMetrics
-          ? {
-              leftArmAngle: Math.round(poseMetrics.leftArmAngle),
-              rightArmAngle: Math.round(poseMetrics.rightArmAngle),
-              spread: Math.round((poseMetrics.spread || 0) * 100) / 100,
-              shoulderTilt: Math.round(poseMetrics.shoulderTilt),
-              torsoLean: Math.round(poseMetrics.torsoLean),
-            }
-          : null,
-      };
-      setAttemptLog((prev) => [attemptEntry, ...prev]);
-
-      if (canCapture) {
-        setFailedAttempts(0);
-        executeCapture(false);
-      } else {
-        setFailedAttempts((prev) => prev + 1);
-        showNotification('Not quite. Check the red parts and try again.');
+  // Cleanup countdown timer on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
       }
-    }
-  }, [countdown, executeCapture, isPoseValid, lastValidAtMs, activeCameraView, poseParts, poseMetrics]);
+      isCountingDownRef.current = false;
+      isCaptureAnywayRef.current = false;
+    };
+  }, []);
 
-  // Capture button: always enabled once camera is active. Pressing during countdown cancels it.
-  const handleManualShutter = () => {
-    if (!hasCameraStream || isCapturing) return;
-    if (countdown !== null) {
+  // Reset countdown if camera becomes inactive
+  useEffect(() => {
+    if (!isCameraActive) {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      isCountingDownRef.current = false;
+      isCaptureAnywayRef.current = false;
       setCountdown(null);
-      countdownStartTimeRef.current = 0;
-      return;
     }
-    countdownStartTimeRef.current = performance.now();
-    setCountdown(RULES.capture.countdownSeconds);
+  }, [isCameraActive]);
+
+  // Reset countdown and failure count when active camera view changes (front <-> side)
+  useEffect(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    isCountingDownRef.current = false;
+    isCaptureAnywayRef.current = false;
+    setCountdown(null);
+    setFailedAttempts(0);
+  }, [activeCameraView]);
+
+  // Single-start countdown handler (started ONLY from click handlers)
+  const startCountdown = useCallback(
+    (captureAnyway = false) => {
+      if (!hasCameraStream || isCapturing) return;
+      if (isCountingDownRef.current) return; // Guard: never start twice
+
+      isCountingDownRef.current = true;
+      isCaptureAnywayRef.current = captureAnyway;
+
+      let remaining = RULES.capture.countdownSeconds || 3;
+      setCountdown(remaining);
+      countdownStartTimeRef.current = performance.now();
+
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+
+      countdownTimerRef.current = setInterval(() => {
+        remaining -= 1;
+
+        if (remaining > 0) {
+          setCountdown(remaining);
+          return;
+        }
+
+        // Reached zero: clear timer and release countdown lock
+        if (countdownTimerRef.current) {
+          clearInterval(countdownTimerRef.current);
+          countdownTimerRef.current = null;
+        }
+        setCountdown(null);
+        isCountingDownRef.current = false;
+
+        const isAnyway = isCaptureAnywayRef.current;
+        isCaptureAnywayRef.current = false;
+
+        // Diagnostic attempt logging
+        const now = performance.now();
+        const view = activeCameraViewRef.current;
+        const validNow = isPoseValidRef.current;
+        const lastValid = lastValidAtMsRef.current;
+        const startMs = countdownStartTimeRef.current;
+        const parts = posePartsRef.current;
+        const metrics = poseMetricsRef.current;
+
+        const canCapture =
+          isAnyway ||
+          shouldCaptureAtZero({
+            isValid: validNow,
+            lastValidAtMs: lastValid,
+            nowMs: now,
+            graceMs: RULES.capture.graceMs,
+          });
+
+        const usedGrace = !validNow && canCapture && !isAnyway;
+
+        const attemptEntry = {
+          timestamp: new Date().toISOString(),
+          view,
+          passed: canCapture,
+          usedGrace,
+          captureAnyway: isAnyway,
+          secondsToGreen:
+            startMs && lastValid > startMs
+              ? Math.round((lastValid - startMs) / 100) / 10
+              : null,
+          failingParts: Object.entries(parts || {})
+            .filter(([_, v]: any) => v?.state === 'bad')
+            .map(([k]) => k),
+          metrics: metrics
+            ? {
+                leftArmAngle: Math.round(metrics.leftArmAngle),
+                rightArmAngle: Math.round(metrics.rightArmAngle),
+                spread: Math.round((metrics.spread || 0) * 100) / 100,
+                shoulderTilt: Math.round(metrics.shoulderTilt),
+                torsoLean: Math.round(metrics.torsoLean),
+              }
+            : null,
+        };
+        setAttemptLog((prev) => [attemptEntry, ...prev]);
+
+        // Grab frame from video element
+        executeCaptureRef.current(isAnyway);
+      }, 1000);
+    },
+    [hasCameraStream, isCapturing]
+  );
+
+  // Capture button: always enabled once camera is active.
+  const handleManualShutter = () => {
+    startCountdown(false);
   };
 
+  // "Capture anyway" button after 3 failed attempts: uses the exact same countdown path
   const handleCaptureAnyway = () => {
-    if (!hasCameraStream || isCapturing) return;
-    setCountdown(null);
-    const attemptEntry = {
-      timestamp: new Date().toISOString(),
-      view: activeCameraView,
-      passed: false,
-      usedGrace: false,
-      captureAnyway: true,
-      secondsToGreen: null,
-      failingParts: Object.entries(poseParts || {})
-        .filter(([_, v]: any) => v?.state === 'bad')
-        .map(([k]) => k),
-      metrics: poseMetrics
-        ? {
-            leftArmAngle: Math.round(poseMetrics.leftArmAngle),
-            rightArmAngle: Math.round(poseMetrics.rightArmAngle),
-            spread: Math.round((poseMetrics.spread || 0) * 100) / 100,
-          }
-        : null,
-    };
-    setAttemptLog((prev) => [attemptEntry, ...prev]);
-    executeCapture(true);
+    startCountdown(true);
   };
 
   const handleToggleMute = () => {
@@ -1132,7 +1185,8 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
               <button
                 type="button"
                 onClick={handleCaptureAnyway}
-                className="px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 animate-fade-in"
+                disabled={!hasCameraStream || isCapturing || countdown !== null}
+                className="px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <AlertCircle className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Capture anyway</span>
@@ -1155,7 +1209,7 @@ export const CameraCaptureScreen: React.FC<CameraCaptureScreenProps> = ({
             <button
               type="button"
               onClick={handleManualShutter}
-              disabled={!hasCameraStream || isCapturing}
+              disabled={!hasCameraStream || isCapturing || countdown !== null}
               className={`w-20 h-20 rounded-full border-4 p-1.5 flex items-center justify-center active:scale-95 transition-all cursor-pointer group shadow-lg ${
                 isPoseValid
                   ? 'border-emerald-500/80 hover:border-emerald-400 shadow-emerald-500/20'
