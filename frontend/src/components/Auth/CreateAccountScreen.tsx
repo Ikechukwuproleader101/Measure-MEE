@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Eye, EyeOff, User, Mail, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { PillSpinner } from '../common/PillLoader';
+import { SolidUser, SolidMail, SolidLock, SolidEye, SolidEyeOff } from '../common/SolidIcons';
 import './signupMotion.css';
 
 interface CreateAccountScreenProps {
@@ -10,10 +11,10 @@ interface CreateAccountScreenProps {
   onLoginClick: () => void;
 }
 
-export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({ 
+export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
   onBack,
   onSuccess,
-  onLoginClick 
+  onLoginClick
 }) => {
   const { signUp } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
@@ -65,7 +66,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
     <div className="relative w-full h-full min-h-screen bg-[#050505] text-white flex flex-col justify-between px-6 py-6 overflow-y-auto max-w-md mx-auto select-none font-sans">
       {/* Top Header */}
       <header className="flex items-center justify-between z-10 w-full">
-        <button 
+        <button
           type="button"
           onClick={onBack}
           className="w-10 h-10 rounded-full bg-[#18181B] hover:bg-[#27272A] flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
@@ -94,8 +95,8 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 w-full">
           {/* Full Name */}
           <div className="auth-input-container">
-            <User className="w-4 h-4 text-[#C69AF3] shrink-0" />
-            <input 
+            <SolidUser className="w-4 h-4 text-[#C69AF3] shrink-0" />
+            <input
               type="text"
               required
               value={fullName}
@@ -108,8 +109,8 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
           {/* Email Address */}
           <div className="auth-input-container">
-            <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
-            <input 
+            <SolidMail className="w-4 h-4 text-[#C69AF3] shrink-0" />
+            <input
               type="email"
               required
               value={email}
@@ -122,8 +123,8 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
           {/* Password */}
           <div className="auth-input-container">
-            <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
-            <input 
+            <SolidLock className="w-4 h-4 text-[#C69AF3] shrink-0" />
+            <input
               type={showPassword ? 'text' : 'password'}
               required
               value={password}
@@ -135,10 +136,10 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="text-[#71717A] hover:text-white cursor-pointer shrink-0"
+              className="text-[#71717A] hover:text-white cursor-pointer shrink-0 border-0 outline-none p-1"
               aria-label="Toggle password visibility"
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? <SolidEyeOff /> : <SolidEye />}
             </button>
           </div>
 
@@ -162,7 +163,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-[56px] mt-2 rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[17px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-70"
+            className="w-full h-[56px] mt-2 rounded-full bg-[#C69AF3] hover:bg-[#ba89eb] active:scale-[0.98] text-[#080808] font-bold text-[17px] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-70 border-0 outline-none"
           >
             {isLoading ? <PillSpinner className="border-black border-t-transparent" /> : 'Sign up'}
           </button>
@@ -171,7 +172,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
       {/* Bottom Switch Link */}
       <div className="z-10 pt-4 pb-2 text-center">
-        <button 
+        <button
           type="button"
           onClick={onLoginClick}
           className="text-sm font-medium text-[#A1A1AA] hover:text-white transition-colors cursor-pointer"

@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Mail, ArrowLeft, X, Check, Lock, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
+import { Mail, ArrowLeft, X, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import { PillSpinner } from '../common/PillLoader';
+import { SolidUser, SolidMail, SolidLock, SolidEye, SolidEyeOff } from '../common/SolidIcons';
 import './signupMotion.css';
 
 interface LoginScreenProps {
@@ -421,7 +422,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <form onSubmit={handleEmailSignIn} className="flex flex-col gap-3.5 w-full">
               {/* Email Input */}
               <div className="auth-input-container">
-                <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <SolidMail className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   ref={emailInputRef}
                   type="email"
@@ -445,7 +446,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
               {/* Password Input */}
               <div className="auth-input-container">
-                <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <SolidLock className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   ref={passwordInputRef}
                   type={showPassword ? 'text' : 'password'}
@@ -459,9 +460,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[#71717A] hover:text-white cursor-pointer shrink-0"
+                  className="text-[#71717A] hover:text-white cursor-pointer shrink-0 border-0 outline-none p-1"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <SolidEyeOff /> : <SolidEye />}
                 </button>
               </div>
 
@@ -551,7 +552,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <form onSubmit={handleEmailSignUp} className="flex flex-col gap-3.5 w-full">
               {/* Full Name */}
               <div className="auth-input-container">
-                <User className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <SolidUser className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   type="text"
                   value={fullName}
@@ -564,7 +565,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
               {/* Email */}
               <div className="auth-input-container">
-                <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <SolidMail className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   type="email"
                   required
@@ -578,7 +579,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
               {/* Password */}
               <div className="auth-input-container">
-                <Lock className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <SolidLock className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -591,9 +592,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[#71717A] hover:text-white cursor-pointer shrink-0"
+                  className="text-[#71717A] hover:text-white cursor-pointer shrink-0 border-0 outline-none p-1"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <SolidEyeOff /> : <SolidEye />}
                 </button>
               </div>
 
@@ -664,7 +665,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
             <form onSubmit={handleForgotPassword} className="flex flex-col gap-3.5 w-full">
               <div className="auth-input-container">
-                <Mail className="w-4 h-4 text-[#C69AF3] shrink-0" />
+                <SolidMail className="w-4 h-4 text-[#C69AF3] shrink-0" />
                 <input
                   type="email"
                   required

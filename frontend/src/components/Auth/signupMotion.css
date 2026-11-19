@@ -141,7 +141,7 @@
   }
 }
 
-/* Authentication Input Form Controls - Dark styling & complete autofill reset */
+/* Authentication Input Form Controls - Dark styling, borderless & complete autofill reset */
 .auth-input-container {
   position: relative;
   width: 100%;
@@ -152,13 +152,18 @@
   align-items: center;
   gap: 12px;
   background-color: #18181B;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: background-color 0.2s ease;
   overflow: hidden;
 }
 
 .auth-input-container:focus-within {
-  border-color: #C69AF3;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: #222226;
 }
 
 .auth-input-field {
