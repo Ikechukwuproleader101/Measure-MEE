@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { env, normalizeOrigin } from './config/env.js';
 import { healthRoutes } from './modules/health/health.routes.js';
 import { usersRoutes } from './modules/users/users.routes.js';
+import { projectsRoutes } from './modules/projects/projects.routes.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -66,6 +67,9 @@ app.use('/', healthRoutes);
 // Mount users routes under both /api/users and /api (for /api/me convenience)
 app.use('/api/users', usersRoutes);
 app.use('/api', usersRoutes);
+
+// Mount projects routes
+app.use('/api/projects', projectsRoutes);
 
 // 7. Not found & central error handling
 app.use(notFound);

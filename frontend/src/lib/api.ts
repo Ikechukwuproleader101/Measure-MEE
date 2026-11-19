@@ -111,3 +111,57 @@ export async function updateProfile(
   });
 }
 
+export interface ProjectItem {
+  id: string;
+  client_id: string;
+  tailor_id: string | null;
+  name: string;
+  status: 'pending_review' | 'cutting' | 'fitting' | 'done';
+  progress: number;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+  measurements?: { count: number }[];
+}
+
+export interface ProjectDetail extends ProjectItem {
+  measurements: any[];
+}
+
+/**
+ * Fetch projects for the authenticated user, optionally filtered by archived state
+ */
+export async function getProjects(archived = false): Promise<ProjectItem[]> {
+  return fetchApi<ProjectItem[]>(`/api/projects?archived=${archived}`);
+}
+
+/**
+ * Create a new project for the authenticated user
+ */
+export async function createProject(name: string): Promise<ProjectItem> {
+  return fetchApi<ProjectItem>('/api/projects', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+/**
+ * Update an existing project (name and/or is_archived)
+ */
+export async function updateProject(
+  id: string,
+  updates: { name?: string; is_archived?: boolean }
+): Promise<ProjectItem> {
+  return fetchApi<ProjectItem>(`/api/projects/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Fetch single project with full measurements
+ */
+export async function getProject(id: string): Promise<ProjectDetail> {
+  return fetchApi<ProjectDetail>(`/api/projects/${id}`);
+}
+
