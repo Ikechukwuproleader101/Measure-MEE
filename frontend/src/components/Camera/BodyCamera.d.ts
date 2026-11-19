@@ -4,6 +4,8 @@ export interface BodyCameraProps {
   onBack?: () => void;
   onComplete?: (blobs: { front: Blob | null; side: Blob | null }, formData?: FormData) => void;
   onUpload?: (formData: FormData, blobs: { front: Blob | null; side: Blob | null }) => Promise<void> | void;
+  userHeight?: number | string;
+  onScanSuccess?: (data: unknown) => void;
 }
 
 export declare const BodyCamera: React.FC<BodyCameraProps>;

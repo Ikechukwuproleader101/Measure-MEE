@@ -1,85 +1,85 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, RefreshCw, Check, AlertCircle, ArrowRight, RotateCcw, User, Zap, ZapOff } from 'lucide-react';
-import { useMediaPipePose } from '../../hooks/useMediaPipePose';
+import {
+  X,
+  RefreshCw,
+  Check,
+  AlertCircle,
+  ArrowRight,
+  RotateCcw,
+  Zap,
+  ZapOff,
+  Camera,
+  Upload,
+} from 'lucide-react';
 import { getStreamWithFallback, shouldAutoRetry } from '../../features/capture/cameraStream';
+import { getCaptureLandmarker } from '../../services/poseLandmarker';
+import { validatePoseByMode } from '../../utils/poseValidation';
+import { PillSpinner } from '../common/PillLoader';
 
 /**
  * BodyCamera Component
  *
- * Implements the camera interface and local state machine for 3D body measurement.
- * Handles high-resolution getUserMedia stream, captures raw frames into HTML5 Canvas,
- * holds image blobs temporarily in browser RAM with review/retake states,
- * and packages them into a multipart FormData request for backend processing.
+ * Implements on-click pose validation, capture state machine (FRONT -> SIDE -> REVIEW),
+ * preview URL lifecycle with retake handlers, and multipart FormData upload to FastAPI.
  */
-export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
-  const [viewMode, setViewMode] = useState('front'); // 'front' | 'side'
+export const BodyCamera = ({
+  onBack,
+  onComplete,
+  onUpload,
+  userHeight = 175,
+  onScanSuccess,
+}) => {
+  // 1. Capture State Machine & Photo Storage
+  const [step, setStep] = useState('FRONT'); // 'FRONT' | 'SIDE' | 'REVIEW'
+  const [frontBlob, setFrontBlob] = useState(null);
+  const [sideBlob, setSideBlob] = useState(null);
+  const [frontPreviewUrl, setFrontPreviewUrl] = useState(null);
+  const [sidePreviewUrl, setSidePreviewUrl] = useState(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(null);
+
+  // 2. Camera Controls & Stream State
   const [facingMode, setFacingMode] = useState('environment'); // 'environment' | 'user'
   const [isFlashOn, setIsFlashOn] = useState(false);
-  const [countdown, setCountdown] = useState(null);
   const [isScreenFlashing, setIsScreenFlashing] = useState(false);
   const [permissionError, setPermissionError] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  // In-memory RAM storage for captured blobs and temporary object preview URLs
-  const [capturedBlobs, setCapturedBlobs] = useState({
-    front: null,
-    side: null,
-  });
-
-  const [previewUrls, setPreviewUrls] = useState({
-    front: null,
-    side: null,
-  });
-
-  // Currently held image being reviewed before committing
-  const [holdingState, setHoldingState] = useState({
-    isHolding: false,
-    view: null, // 'front' | 'side'
-    blob: null,
-    previewUrl: null,
-  });
+  const [isCameraPlaying, setIsCameraPlaying] = useState(false);
+  const [restartKey, setRestartKey] = useState(0);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const canvasRef = useRef(null);
-  const isCountingDownRef = useRef(false);
-  const countdownTimerRef = useRef(null);
-  const executeCaptureRef = useRef(null);
-
-  const [isCameraPlaying, setIsCameraPlaying] = useState(false);
-  const [restartKey, setRestartKey] = useState(0);
   const startIdRef = useRef(0);
   const autoRetriesRef = useRef(0);
 
-  // Real-time on-device MediaPipe Pose detection & A-pose tracking
-  const {
-    isReady: isPoseReady,
-    isLoading: isPoseLoading,
-    isValid: isPoseValid,
-    reasons: poseReasons,
-    landmarks: poseLandmarks,
-  } = useMediaPipePose(videoRef, {
-    enabled: !holdingState.isHolding && isCameraPlaying,
-    viewMode,
-    fps: 15,
-  });
+  // Keep references to preview URLs for safe cleanup on unmount
+  const frontPreviewUrlRef = useRef(frontPreviewUrl);
+  const sidePreviewUrlRef = useRef(sidePreviewUrl);
 
-  // Log tracking status to console for live monitoring
   useEffect(() => {
-    if (isPoseReady) {
-      console.log('[MediaPipe Pose Tracker]', {
-        active: true,
-        ready: isPoseReady,
-        valid: isPoseValid,
-        landmarksCount: poseLandmarks ? poseLandmarks.length : 0,
-        hint: poseReasons[0] || 'Valid',
-      });
-    }
-  }, [isPoseReady, isPoseValid, poseLandmarks, poseReasons]);
+    frontPreviewUrlRef.current = frontPreviewUrl;
+    sidePreviewUrlRef.current = sidePreviewUrl;
+  }, [frontPreviewUrl, sidePreviewUrl]);
 
-  // 1. Initialize High-Resolution getUserMedia Stream
+  // Clean up Object URLs on component unmount
   useEffect(() => {
-    if (holdingState.isHolding) {
+    return () => {
+      if (frontPreviewUrlRef.current) URL.revokeObjectURL(frontPreviewUrlRef.current);
+      if (sidePreviewUrlRef.current) URL.revokeObjectURL(sidePreviewUrlRef.current);
+    };
+  }, []);
+
+  // 3. Camera Stream Initialization (hardware stays idle when in REVIEW)
+  useEffect(() => {
+    if (step === 'REVIEW') {
+      // Pause/stop active camera tracks so hardware stays idle during review
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
       setIsCameraPlaying(false);
       return;
     }
@@ -107,7 +107,7 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
       }
 
       stopStream();
-      await sleep(150); // let the phone fully release the previous camera
+      await sleep(150); // allow device to release previous camera hardware
       if (cancelled) return;
 
       try {
@@ -124,15 +124,17 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
         video.playsInline = true;
         video.srcObject = stream;
         video.addEventListener('loadedmetadata', () => video.play().catch(() => {}), { once: true });
+
         try {
           await video.play();
         } catch (e) {
           if (e.name !== 'AbortError') console.warn('Video play failed:', e);
         }
+
         if (cancelled) return;
         setIsCameraPlaying(true);
 
-        // Safety net: if no picture arrives, restart the camera automatically.
+        // Safety retry watchdog if video dimensions stay 0
         watchdog = setTimeout(() => {
           const v = videoRef.current;
           if (cancelled || !v) return;
@@ -157,276 +159,171 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
       if (watchdog) clearTimeout(watchdog);
       stopStream();
     };
-  }, [facingMode, holdingState.isHolding, restartKey]);
+  }, [facingMode, step, restartKey]);
 
-  // Optional diagnostics (?debug=pose flag or console.debug)
-  const isDebugMode = typeof window !== 'undefined' && (
-    window.location.search.includes('debug=pose') ||
-    window.location.hash.includes('debug=pose')
-  );
-
-  const [debugState, setDebugState] = useState({
-    videoWidth: 0,
-    videoHeight: 0,
-    readyState: 0,
-    retries: 0,
-  });
-
-  useEffect(() => {
-    if (!isDebugMode) {
-      console.debug('[BodyCamera debug]', {
-        facingMode,
-        videoWidth: videoRef.current?.videoWidth || 0,
-        videoHeight: videoRef.current?.videoHeight || 0,
-        readyState: videoRef.current?.readyState || 0,
-        retries: autoRetriesRef.current,
-        isCameraPlaying,
-      });
-      return;
-    }
-
-    const interval = setInterval(() => {
-      const v = videoRef.current;
-      setDebugState({
-        videoWidth: v?.videoWidth || 0,
-        videoHeight: v?.videoHeight || 0,
-        readyState: v?.readyState ?? 0,
-        retries: autoRetriesRef.current,
-      });
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [isDebugMode, facingMode, isCameraPlaying]);
-
-  // Clean up Object URLs from browser RAM when unmounting
-  useEffect(() => {
-    return () => {
-      if (previewUrls.front) URL.revokeObjectURL(previewUrls.front);
-      if (previewUrls.side) URL.revokeObjectURL(previewUrls.side);
-      if (holdingState.previewUrl) URL.revokeObjectURL(holdingState.previewUrl);
-    };
-  }, [previewUrls, holdingState.previewUrl]);
-
-  // 2. High-Resolution Frame Capture to Memory Blob
-  const captureFrameToBlob = () => {
+  // 4. On-Click Pose Validation & Frame Capture
+  const handleCaptureClick = async () => {
+    if (isValidating || isUploading) return;
     const video = videoRef.current;
-    if (!video) return null;
+    if (!video || !video.videoWidth || !video.videoHeight) return;
 
-    const width = video.videoWidth || 1920;
-    const height = video.videoHeight || 1080;
-
-    let canvas = canvasRef.current;
-    if (!canvas) {
-      canvas = document.createElement('canvas');
-      canvasRef.current = canvas;
-    }
-
-    canvas.width = width;
-    canvas.height = height;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    // Draw video frame onto offscreen canvas
-    ctx.drawImage(video, 0, 0, width, height);
-
-    return new Promise((resolve) => {
-      canvas.toBlob(
-        (blob) => {
-          resolve(blob);
-        },
-        'image/jpeg',
-        0.95
-      );
-    });
-  };
-
-  // Trigger Shutter Flash & Hold Image in State
-  const executeCapture = async () => {
+    setIsValidating(true);
+    setStatusMessage(null);
     setIsScreenFlashing(true);
     setTimeout(() => setIsScreenFlashing(false), 200);
 
-    const blob = await captureFrameToBlob();
-    if (!blob) return;
+    try {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
 
-    // Store temporarily in RAM and create preview Object URL
-    const tempUrl = URL.createObjectURL(blob);
+      // Draw current video frame onto offscreen canvas at native resolution
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
 
-    // Pause video feed
-    if (videoRef.current) {
-      videoRef.current.pause();
-    }
-
-    // Enter temporary holding state
-    setHoldingState({
-      isHolding: true,
-      view: viewMode,
-      blob,
-      previewUrl: tempUrl,
-    });
-  };
-
-  executeCaptureRef.current = executeCapture;
-
-  // Countdown timer cleanup
-  useEffect(() => {
-    return () => {
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-        countdownTimerRef.current = null;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas rendering context not available');
       }
-      isCountingDownRef.current = false;
-    };
-  }, []);
+      ctx.drawImage(video, 0, 0, width, height);
 
-  const handleManualShutter = () => {
-    if (isCountingDownRef.current || holdingState.isHolding) return;
-    isCountingDownRef.current = true;
+      // Export JPEG blob (0.92 quality)
+      const blob = await new Promise((resolve) => {
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92);
+      });
 
-    let remaining = 3;
-    setCountdown(remaining);
+      if (!blob) {
+        throw new Error('Failed to create image file');
+      }
 
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-      countdownTimerRef.current = null;
-    }
+      // Execute MediaPipe Pose landmarker on the captured canvas
+      const landmarker = await getCaptureLandmarker();
+      const detectionResult = landmarker.detect(canvas);
+      const landmarks = detectionResult?.landmarks?.[0];
 
-    countdownTimerRef.current = setInterval(() => {
-      remaining -= 1;
+      const activeMode = step === 'FRONT' ? 'front' : 'side';
+      const validation =
+        landmarks && landmarks.length >= 33
+          ? validatePoseByMode(landmarks, activeMode)
+          : { valid: false, reasons: ['No person clearly detected'] };
 
-      if (remaining > 0) {
-        setCountdown(remaining);
+      // Check validation outcome
+      if (!validation.valid) {
+        // Discard candidate frame without saving
+        setStatusMessage('Pose not valid. Adjust your position and tap capture again.');
+        setIsValidating(false);
         return;
       }
 
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-        countdownTimerRef.current = null;
+      // Validation passed - commit blob and transition state machine
+      if (step === 'FRONT') {
+        if (frontPreviewUrl) {
+          URL.revokeObjectURL(frontPreviewUrl);
+        }
+        setFrontBlob(blob);
+        setFrontPreviewUrl(URL.createObjectURL(blob));
+        setStep('SIDE');
+      } else if (step === 'SIDE') {
+        if (sidePreviewUrl) {
+          URL.revokeObjectURL(sidePreviewUrl);
+        }
+        setSideBlob(blob);
+        setSidePreviewUrl(URL.createObjectURL(blob));
+        setStep('REVIEW');
       }
-      setCountdown(null);
-      isCountingDownRef.current = false;
-
-      executeCaptureRef.current?.();
-    }, 1000);
-  };
-
-  // 3. User Actions on Held Image (Retake vs Accept)
-  const handleRetakeHeldImage = () => {
-    if (holdingState.previewUrl) {
-      URL.revokeObjectURL(holdingState.previewUrl);
-    }
-
-    // Reset holding state to resume live video feed
-    setHoldingState({
-      isHolding: false,
-      view: null,
-      blob: null,
-      previewUrl: null,
-    });
-
-    if (videoRef.current && streamRef.current) {
-      videoRef.current.play().catch(() => {});
+    } catch (err) {
+      console.error('Capture validation error:', err);
+      setStatusMessage('Pose not valid. Adjust your position and tap capture again.');
+    } finally {
+      setIsValidating(false);
     }
   };
 
-  const handleAcceptHeldImage = async () => {
-    const { view, blob, previewUrl } = holdingState;
-    if (!blob || !view) return;
-
-    // Save into committed in-memory state
-    const nextBlobs = {
-      ...capturedBlobs,
-      [view]: blob,
-    };
-    const nextPreviews = {
-      ...previewUrls,
-      [view]: previewUrl,
-    };
-
-    setCapturedBlobs(nextBlobs);
-    setPreviewUrls(nextPreviews);
-
-    // Clear holding state
-    setHoldingState({
-      isHolding: false,
-      view: null,
-      blob: null,
-      previewUrl: null,
-    });
-
-    // Check if both views are ready
-    if (view === 'front') {
-      if (!nextBlobs.side) {
-        // Transition to Side View
-        setViewMode('side');
-      } else {
-        // Both complete
-        handleFinalSubmission(nextBlobs);
-      }
-    } else if (view === 'side') {
-      if (!nextBlobs.front) {
-        // Transition to Front View
-        setViewMode('front');
-      } else {
-        // Both complete
-        handleFinalSubmission(nextBlobs);
-      }
+  // 5. Retake & Reset Handlers with Memory Management
+  const handleRetakeFront = () => {
+    if (frontPreviewUrl) {
+      URL.revokeObjectURL(frontPreviewUrl);
     }
+    setFrontBlob(null);
+    setFrontPreviewUrl(null);
+    setStatusMessage(null);
+    setStep('FRONT');
   };
 
-  // 4. Multipart FormData Upload Packaging
-  const handleFinalSubmission = async (blobs) => {
-    if (!blobs.front || !blobs.side) return;
+  const handleRetakeSide = () => {
+    if (sidePreviewUrl) {
+      URL.revokeObjectURL(sidePreviewUrl);
+    }
+    setSideBlob(null);
+    setSidePreviewUrl(null);
+    setStatusMessage(null);
+    setStep('SIDE');
+  };
+
+  const handleResetAll = () => {
+    if (frontPreviewUrl) {
+      URL.revokeObjectURL(frontPreviewUrl);
+    }
+    if (sidePreviewUrl) {
+      URL.revokeObjectURL(sidePreviewUrl);
+    }
+    setFrontBlob(null);
+    setSideBlob(null);
+    setFrontPreviewUrl(null);
+    setSidePreviewUrl(null);
+    setStatusMessage(null);
+    setStep('FRONT');
+  };
+
+  // 6. FastAPI Upload Handler
+  const handleUploadScan = async () => {
+    if (!frontBlob || !sideBlob) {
+      setStatusMessage('Both front and side photos are required.');
+      return;
+    }
 
     setIsUploading(true);
+    setStatusMessage(null);
 
     try {
       const formData = new FormData();
-      formData.append('front', blobs.front, 'front_view.jpg');
-      formData.append('side', blobs.side, 'side_view.jpg');
+      formData.append('front_image', frontBlob, 'front.jpg');
+      formData.append('side_image', sideBlob, 'side.jpg');
+      formData.append('height_cm', String(userHeight));
+
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const cleanBase = apiBase.replace(/\/+$/, '');
+      const response = await fetch(`${cleanBase}/api/v1/scan`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed (${response.status})`);
+      }
+
+      const data = await response.json();
+      onScanSuccess?.(data);
 
       if (onUpload) {
-        await onUpload(formData, blobs);
+        await onUpload(formData, { front: frontBlob, side: sideBlob });
       } else if (onComplete) {
-        onComplete(blobs, formData);
+        onComplete({ front: frontBlob, side: sideBlob }, formData);
       }
     } catch (err) {
-      console.error('Error during photo package upload:', err);
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      setStatusMessage(msg);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const stepNumber = viewMode === 'front' ? 1 : 2;
-  const currentViewLabel = viewMode === 'front' ? 'Front View' : 'Side View';
-
   return (
     <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between max-w-lg mx-auto overflow-hidden select-none font-sans">
-      {/* Screen Shutter Flash Overlay */}
+      {/* Shutter Screen Flash Animation */}
       {isScreenFlashing && (
         <div className="absolute inset-0 z-50 bg-white/90 animate-fade-in pointer-events-none" />
       )}
-
-      {/* Camera Stream Viewfinder */}
-      <div className="absolute inset-0 w-full h-full z-0 overflow-hidden bg-black flex items-center justify-center">
-        {holdingState.isHolding && holdingState.previewUrl ? (
-          /* Held Image Frozen in RAM */
-          <img
-            src={holdingState.previewUrl}
-            alt="Held captured preview"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          /* Live Video Stream */
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover opacity-85 brightness-95"
-          />
-        )}
-      </div>
 
       {/* Permission Error Banner */}
       {permissionError && (
@@ -436,20 +333,39 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
         </div>
       )}
 
-      {/* Debug Readout (?debug=pose only) */}
-      {isDebugMode && (
-        <div className="absolute top-20 left-4 z-40 bg-black/85 text-emerald-400 font-mono text-[10px] p-2.5 rounded-lg border border-emerald-500/30 shadow-lg pointer-events-none flex flex-col gap-0.5">
-          <div>Facing: {facingMode}</div>
-          <div>Resolution: {debugState.videoWidth}x{debugState.videoHeight}</div>
-          <div>ReadyState: {debugState.readyState}</div>
-          <div>Retries: {debugState.retries}</div>
-          <div>Playing: {isCameraPlaying ? 'true' : 'false'}</div>
+      {/* Status & Validation Error Message Toast */}
+      {statusMessage && (
+        <div className="absolute top-20 left-4 right-4 z-40 bg-amber-500/95 text-black p-3 rounded-2xl flex items-center gap-2 text-xs font-bold shadow-xl backdrop-blur-md animate-fade-in">
+          <AlertCircle className="w-4 h-4 shrink-0 stroke-[2.5]" />
+          <span className="flex-1">{statusMessage}</span>
+          <button
+            type="button"
+            onClick={() => setStatusMessage(null)}
+            className="p-1 hover:bg-black/10 rounded-full cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Validating Pose Spinner Overlay */}
+      {isValidating && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-xs">
+          <PillSpinner className="w-10 h-10 text-primary animate-spin mb-2" />
+          <span className="text-xs font-bold text-foreground">Validating pose...</span>
+        </div>
+      )}
+
+      {/* Uploading Server Spinner Overlay */}
+      {isUploading && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/70 backdrop-blur-xs">
+          <PillSpinner className="w-10 h-10 text-primary animate-spin mb-2" />
+          <span className="text-xs font-bold text-foreground">Uploading scan to server...</span>
         </div>
       )}
 
       {/* Top Header Bar */}
       <header className="px-5 pt-6 pb-2 flex items-center justify-between z-30 w-full">
-        {/* Left: Close/Back Button */}
         <button
           type="button"
           onClick={onBack}
@@ -459,111 +375,177 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
           <X className="w-5 h-5 stroke-[2]" />
         </button>
 
-        {/* Center: Step & Angle Badge */}
+        {/* Center Step Badge */}
         <div className="px-4 py-2 rounded-full bg-primary/20 border border-primary/30 backdrop-blur-md flex items-center gap-2 text-xs font-semibold text-primary shadow-sm">
-          <span>Step {stepNumber} of 2</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-          <span>{currentViewLabel}</span>
+          {step === 'FRONT' && <span>Step 1 of 2 • Front View</span>}
+          {step === 'SIDE' && <span>Step 2 of 2 • Side View</span>}
+          {step === 'REVIEW' && <span>Review Captures</span>}
         </div>
 
-        {/* Right: Flash Toggle */}
-        <button
-          type="button"
-          onClick={() => setIsFlashOn(!isFlashOn)}
-          className={`w-11 h-11 rounded-full backdrop-blur-md border flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95 ${
-            isFlashOn
-              ? 'bg-primary text-primary-foreground border-primary shadow-primary/30'
-              : 'bg-card/80 text-primary border-border hover:bg-card'
-          }`}
-          aria-label={isFlashOn ? 'Disable flash' : 'Enable flash'}
-        >
-          {isFlashOn ? <Zap className="w-5 h-5 fill-current" /> : <ZapOff className="w-5 h-5 stroke-[2]" />}
-        </button>
+        {/* Right Flash Toggle (available only in active camera modes) */}
+        {step !== 'REVIEW' ? (
+          <button
+            type="button"
+            onClick={() => setIsFlashOn(!isFlashOn)}
+            className={`w-11 h-11 rounded-full backdrop-blur-md border flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95 ${
+              isFlashOn
+                ? 'bg-primary text-primary-foreground border-primary shadow-primary/30'
+                : 'bg-card/80 text-primary border-border hover:bg-card'
+            }`}
+            aria-label={isFlashOn ? 'Disable flash' : 'Enable flash'}
+          >
+            {isFlashOn ? <Zap className="w-5 h-5 fill-current" /> : <ZapOff className="w-5 h-5 stroke-[2]" />}
+          </button>
+        ) : (
+          <div className="w-11" />
+        )}
       </header>
 
-      {/* Main Viewfinder Overlay */}
-      <main className="relative flex-1 flex flex-col items-center justify-center overflow-hidden px-4 z-10 my-1">
-        {/* Countdown Center Overlay */}
-        {countdown !== null && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/50 backdrop-blur-xs rounded-3xl animate-fade-in">
-            <span className="text-8xl font-black text-primary font-display animate-ping select-none">
-              {countdown}
-            </span>
-          </div>
-        )}
+      {/* Main View Area */}
+      {step === 'REVIEW' ? (
+        /* REVIEW SCREEN */
+        <main className="flex-1 px-5 py-4 flex flex-col justify-between overflow-y-auto z-20">
+          <div className="w-full">
+            <h2 className="text-lg font-bold text-foreground text-center">
+              Your Measurement Photos
+            </h2>
+            <p className="text-xs text-muted-foreground text-center mt-1">
+              Height: {userHeight} cm • Both captures ready for geometric extraction
+            </p>
 
-        {/* Temporary Held State Banner Overlay */}
-        {holdingState.isHolding && (
-          <div className="absolute top-4 px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg animate-fade-in z-20 flex items-center gap-2">
-            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>{holdingState.view === 'front' ? 'Front' : 'Side'} photo held in RAM</span>
-          </div>
-        )}
+            {/* Photo Cards Grid */}
+            <div className="grid grid-cols-2 gap-3.5 mt-5">
+              {/* Front Photo Card */}
+              <div className="flex flex-col gap-2">
+                <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-card border border-border shadow-md">
+                  {frontPreviewUrl ? (
+                    <img
+                      src={frontPreviewUrl}
+                      alt="Front capture"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                      No front photo
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs text-[10px] font-semibold text-white flex items-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-400 stroke-[3]" />
+                    <span>Front</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRetakeFront}
+                  className="w-full py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>Retake Front</span>
+                </button>
+              </div>
 
-        {/* Viewfinder Brackets - Glow green when pose is valid */}
-        <div className={`absolute top-2 left-6 w-9 h-9 border-t-[2.5px] border-l-[2.5px] rounded-tl-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
-        <div className={`absolute top-2 right-6 w-9 h-9 border-t-[2.5px] border-r-[2.5px] rounded-tr-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
-        <div className={`absolute bottom-24 left-6 w-9 h-9 border-b-[2.5px] border-l-[2.5px] rounded-bl-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
-        <div className={`absolute bottom-24 right-6 w-9 h-9 border-b-[2.5px] border-r-[2.5px] rounded-br-2xl pointer-events-none transition-colors duration-300 ${isPoseValid ? 'border-emerald-400' : 'border-primary/80'}`} />
-
-        {/* Center Vertical Hairline Alignment Line */}
-        <div className={`absolute inset-y-4 left-1/2 -translate-x-1/2 w-[1px] pointer-events-none transition-colors duration-300 ${isPoseValid ? 'bg-emerald-400/70' : 'bg-primary/30'}`} />
-
-        {/* Distance guidance pill - Live dynamic guidance */}
-        {!holdingState.isHolding && (
-          <div className="mt-auto mb-3 px-5 py-2 rounded-full bg-card/90 backdrop-blur-md border border-border shadow-lg flex items-center gap-3 animate-fade-in z-20">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-              isPoseValid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-primary/20 text-primary'
-            }`}>
-              {isPoseValid ? <Check className="w-4 h-4 stroke-[2.5]" /> : <User className="w-4 h-4 fill-current" />}
+              {/* Side Photo Card */}
+              <div className="flex flex-col gap-2">
+                <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-card border border-border shadow-md">
+                  {sidePreviewUrl ? (
+                    <img
+                      src={sidePreviewUrl}
+                      alt="Side capture"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                      No side photo
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xs text-[10px] font-semibold text-white flex items-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-400 stroke-[3]" />
+                    <span>Side</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRetakeSide}
+                  className="w-full py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>Retake Side</span>
+                </button>
+              </div>
             </div>
-            <div className="flex flex-col text-left">
-              <span className="text-xs font-bold text-foreground leading-tight">
-                {isPoseLoading
-                  ? 'Loading pose tracker...'
-                  : isPoseValid
-                  ? 'Pose Locked & Stable'
-                  : poseReasons[0] || 'Stand 2 meters back'}
-              </span>
-              <span className="text-[11px] text-muted-foreground leading-tight">
-                {isPoseValid ? '(Ready to capture)' : '(Full body must be visible)'}
-              </span>
-            </div>
           </div>
-        )}
-      </main>
 
-      {/* Bottom Control Bar */}
-      <footer className="w-full rounded-t-[32px] bg-card border-t border-border px-8 pt-5 pb-8 flex items-center justify-between shadow-2xl z-30 relative">
-        {holdingState.isHolding ? (
-          /* Held State Decision Buttons (Retake vs Keep) */
-          <div className="w-full flex items-center justify-between gap-4">
+          {/* Action Row */}
+          <div className="flex flex-col gap-2.5 pt-6 pb-2">
             <button
               type="button"
-              onClick={handleRetakeHeldImage}
-              className="flex-1 h-[52px] rounded-2xl bg-secondary/80 hover:bg-secondary text-foreground font-semibold text-sm flex items-center justify-center gap-2 border border-border cursor-pointer transition-all active:scale-[0.98]"
+              onClick={handleUploadScan}
+              disabled={isUploading || !frontBlob || !sideBlob}
+              className="w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-primary/25 transition-all cursor-pointer active:scale-[0.98] disabled:opacity-50"
             >
-              <RotateCcw className="w-4 h-4 text-muted-foreground" />
-              <span>Retake</span>
+              <Upload className="w-4 h-4" />
+              <span>{isUploading ? 'Uploading...' : 'Upload & Analyze Scan'}</span>
+              <ArrowRight className="w-4 h-4 ml-1" />
             </button>
 
             <button
               type="button"
-              onClick={handleAcceptHeldImage}
+              onClick={handleResetAll}
               disabled={isUploading}
-              className="flex-1 h-[52px] rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-primary/25 cursor-pointer transition-all active:scale-[0.98] disabled:opacity-60"
+              className="w-full h-10 rounded-2xl bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             >
-              <span>{viewMode === 'front' && !capturedBlobs.side ? 'Use & Continue' : 'Confirm Both'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Retake All Photos</span>
             </button>
           </div>
-        ) : (
-          /* Normal Live Camera Capture Controls */
-          <>
+        </main>
+      ) : (
+        /* CAMERA VIEWFINDER (FRONT or SIDE) */
+        <>
+          <div className="absolute inset-0 w-full h-full z-0 overflow-hidden bg-black flex items-center justify-center">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover opacity-90"
+            />
+          </div>
+
+          <main className="relative flex-1 flex flex-col items-center justify-center overflow-hidden px-4 z-10 my-1 pointer-events-none">
+            {/* Viewfinder Brackets */}
+            <div className="absolute top-2 left-6 w-9 h-9 border-t-[2.5px] border-l-[2.5px] rounded-tl-2xl border-primary/80" />
+            <div className="absolute top-2 right-6 w-9 h-9 border-t-[2.5px] border-r-[2.5px] rounded-tr-2xl border-primary/80" />
+            <div className="absolute bottom-24 left-6 w-9 h-9 border-b-[2.5px] border-l-[2.5px] rounded-bl-2xl border-primary/80" />
+            <div className="absolute bottom-24 right-6 w-9 h-9 border-b-[2.5px] border-r-[2.5px] rounded-br-2xl border-primary/80" />
+
+            {/* Center Hairline */}
+            <div className="absolute inset-y-4 left-1/2 -translate-x-1/2 w-[1px] bg-primary/30" />
+
+            {/* View Direction Guidance Pill */}
+            <div className="mt-auto mb-3 px-5 py-2.5 rounded-full bg-card/90 backdrop-blur-md border border-border shadow-lg flex items-center gap-2.5 animate-fade-in pointer-events-auto">
+              <Camera className="w-4 h-4 text-primary shrink-0" />
+              <div className="flex flex-col text-left">
+                <span className="text-xs font-bold text-foreground leading-tight">
+                  {step === 'FRONT'
+                    ? 'Stand in A-Pose (arms away from body)'
+                    : 'Turn 90° with arms relaxed at your side'}
+                </span>
+                <span className="text-[11px] text-muted-foreground leading-tight">
+                  Full body must be visible • Tap button to validate & capture
+                </span>
+              </div>
+            </div>
+          </main>
+
+          {/* Shutter Bar */}
+          <footer className="w-full rounded-t-[32px] bg-card border-t border-border px-8 pt-5 pb-8 flex items-center justify-between shadow-2xl z-30 relative">
             <div className="w-14 flex items-center justify-start">
               <button
                 type="button"
-                onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+                onClick={() =>
+                  setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))
+                }
                 className="w-11 h-11 rounded-2xl bg-secondary/50 hover:bg-secondary border border-border flex flex-col items-center justify-center text-foreground transition-all cursor-pointer shadow-sm active:scale-95 group"
                 aria-label="Flip camera"
               >
@@ -574,31 +556,25 @@ export const BodyCamera = ({ onBack, onComplete, onUpload }) => {
             <div className="flex-1 flex justify-center">
               <button
                 type="button"
-                onClick={handleManualShutter}
-                disabled={countdown !== null}
-                className={`w-20 h-20 rounded-full border-4 p-1.5 flex items-center justify-center active:scale-95 transition-all cursor-pointer group shadow-lg ${
-                  isPoseValid
-                    ? 'border-emerald-500/80 hover:border-emerald-400 shadow-emerald-500/20'
-                    : 'border-primary/35 hover:border-primary/60 shadow-primary/20'
-                } disabled:opacity-50`}
-                aria-label="Capture photo"
+                onClick={handleCaptureClick}
+                disabled={isValidating || isUploading || !isCameraPlaying}
+                className="w-20 h-20 rounded-full border-4 p-1.5 border-primary/40 hover:border-primary/80 flex items-center justify-center active:scale-95 transition-all cursor-pointer group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Capture and validate photo"
               >
-                <div className={`w-full h-full rounded-full transition-colors shadow-inner flex items-center justify-center ${
-                  isPoseValid ? 'bg-emerald-500 group-hover:bg-emerald-400' : 'bg-primary group-hover:bg-primary/90'
-                }`} />
+                <div className="w-full h-full rounded-full transition-colors bg-primary group-hover:bg-primary/90 shadow-inner flex items-center justify-center" />
               </button>
             </div>
 
             <div className="w-14 flex items-center justify-end">
               <div className="text-right">
                 <span className="text-[11px] font-semibold text-muted-foreground">
-                  {viewMode === 'front' ? '1/2' : '2/2'}
+                  {step === 'FRONT' ? '1/2' : '2/2'}
                 </span>
               </div>
             </div>
-          </>
-        )}
-      </footer>
+          </footer>
+        </>
+      )}
     </div>
   );
 };
