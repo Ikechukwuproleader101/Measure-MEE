@@ -61,3 +61,19 @@ export const projectParamsSchema = z.object({
   id: z.string().uuid({ message: 'Invalid project ID format' }),
 });
 
+/**
+ * Zod schema for adding a measurement to a project.
+ * Validates description: trimmed, required, 1 to 80 characters.
+ */
+export const createMeasurementSchema = z
+  .object({
+    description: z
+      .string({ required_error: 'Description is required' })
+      .trim()
+      .min(1, { message: 'Description must be between 1 and 80 characters' })
+      .max(80, { message: 'Description must be between 1 and 80 characters' }),
+  })
+  .strict({
+    message: 'Only description is permitted when adding a measurement',
+  });
+

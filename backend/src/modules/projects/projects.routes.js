@@ -7,6 +7,7 @@ import {
   createProjectSchema,
   updateProjectSchema,
   projectParamsSchema,
+  createMeasurementSchema,
 } from './projects.schemas.js';
 
 const router = Router();
@@ -41,6 +42,12 @@ router.patch(
   '/:id',
   validate({ params: projectParamsSchema, body: updateProjectSchema }),
   projectsController.updateProject
+);
+
+router.post(
+  '/:id/measurements',
+  validate({ params: projectParamsSchema, body: createMeasurementSchema }),
+  projectsController.createMeasurement
 );
 
 export const projectsRoutes = router;

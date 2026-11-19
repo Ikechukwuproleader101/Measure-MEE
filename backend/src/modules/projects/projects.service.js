@@ -45,3 +45,21 @@ export const getCurrentProject = async (accessToken, user) => {
   return project || null;
 };
 
+export const addMeasurement = async (accessToken, user, projectId, { description }) => {
+  const client = createUserClient(accessToken);
+
+  // 1. Verify project exists and belongs to user
+  const project = await projectsRepository.getProjectById(client, user.id, projectId);
+  if (!project) {
+    throw new AppError(404, 'NOT_FOUND', 'Project not found');
+  }
+
+  // 2. Insert measurement
+  const measurement = await projectsRepository.createMeasurement(client, projectId, description);
+
+  // 3. Touch parent project's updated_at timestamp
+  await projectsRepository.touchProjectUpdatedAt(client, user.id, projectId);
+
+  return measurement;
+};
+

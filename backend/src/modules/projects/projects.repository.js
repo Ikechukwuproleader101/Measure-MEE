@@ -93,4 +93,37 @@ export const getCurrentProject = async (client, userId) => {
   return data || null;
 };
 
+/**
+ * Create a new measurement record under a project.
+ * Inserts with project_id and empty object data: {}.
+ */
+export const createMeasurement = async (client, projectId, description) => {
+  const { data, error } = await client
+    .from('measurements')
+    .insert({
+      project_id: projectId,
+      description,
+      data: {},
+    })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Touch parent project's updated_at timestamp so that adding a measurement
+ * moves the project to the top of the user's active/current projects list.
+ */
+export const touchProjectUpdatedAt = async (client, userId, projectId) => {
+  const { error } = await client
+    .from('projects')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+    .eq('client_id', userId);
+
+  if (error) throw error;
+};
+
 

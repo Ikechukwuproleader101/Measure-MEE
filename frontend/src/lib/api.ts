@@ -124,8 +124,37 @@ export interface ProjectItem {
   measurements?: { count: number }[];
 }
 
+export interface MeasurementItem {
+  id: string;
+  project_id: string;
+  description: string;
+  data: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface ProjectDetail extends ProjectItem {
-  measurements: any[];
+  measurements: MeasurementItem[];
+}
+
+/**
+ * Fetch the user's current most recently touched active project.
+ * Returns null if the user has no matching active project.
+ */
+export async function getCurrentProject(): Promise<ProjectItem | null> {
+  return fetchApi<ProjectItem | null>('/api/projects/current');
+}
+
+/**
+ * Add a new measurement to a project
+ */
+export async function addProjectMeasurement(
+  projectId: string,
+  description: string
+): Promise<MeasurementItem> {
+  return fetchApi<MeasurementItem>(`/api/projects/${projectId}/measurements`, {
+    method: 'POST',
+    body: JSON.stringify({ description }),
+  });
 }
 
 /**

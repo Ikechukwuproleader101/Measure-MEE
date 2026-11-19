@@ -48,3 +48,13 @@ export const getCurrentProject = asyncHandler(async (req, res) => {
   res.status(200).json(project);
 });
 
+export const createMeasurement = asyncHandler(async (req, res) => {
+  const measurement = await projectsService.addMeasurement(
+    req.accessToken,
+    req.user,
+    req.params.id,
+    req.body
+  );
+  res.status(201).json(measurement);
+});
+

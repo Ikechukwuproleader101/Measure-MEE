@@ -444,5 +444,128 @@ describe('Projects Module Endpoints (/api/projects)', () => {
       expect(res.body.error.code).toBe('NOT_FOUND');
     });
   });
+
+  describe('POST /api/projects/:id/measurements', () => {
+    const projectId = '2d8bb5d1-eaee-4f93-b68a-f74f7fc66d48';
+
+    it('creates a new measurement and touches parent project updated_at', async () => {
+      const singleProject = {
+        id: projectId,
+        client_id: regularUser.id,
+        name: "Ada's Lace",
+      };
+
+      const createdMeasurement = {
+        id: 'm-12345',
+        project_id: projectId,
+        description: 'Gown',
+        data: {},
+        created_at: '2026-11-19T14:00:00Z',
+      };
+
+      // 1. mock getProjectById check
+      mockUserClient.from.mockReturnValueOnce({
+        select: vi.fn().mockReturnValueOnce({
+          eq: vi.fn().mockReturnValueOnce({
+            eq: vi.fn().mockReturnValueOnce({
+              maybeSingle: vi.fn().mockResolvedValueOnce({
+                data: singleProject,
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      });
+
+      // 2. mock createMeasurement insert
+      mockUserClient.from.mockReturnValueOnce({
+        insert: vi.fn().mockReturnValueOnce({
+          select: vi.fn().mockReturnValueOnce({
+            single: vi.fn().mockResolvedValueOnce({
+              data: createdMeasurement,
+              error: null,
+            }),
+          }),
+        }),
+      });
+
+      // 3. mock touchProjectUpdatedAt
+      const updateMock = vi.fn().mockReturnValueOnce({
+        eq: vi.fn().mockReturnValueOnce({
+          eq: vi.fn().mockResolvedValueOnce({
+            data: null,
+            error: null,
+          }),
+        }),
+      });
+      mockUserClient.from.mockReturnValueOnce({
+        update: updateMock,
+      });
+
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/measurements`)
+        .set('Authorization', 'Bearer valid-token')
+        .send({ description: 'Gown' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.id).toBe('m-12345');
+      expect(res.body.description).toBe('Gown');
+      expect(res.body.data).toEqual({});
+      expect(updateMock).toHaveBeenCalled();
+    });
+
+    it('rejects missing or empty description with 400', async () => {
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/measurements`)
+        .set('Authorization', 'Bearer valid-token')
+        .send({ description: '   ' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects description longer than 80 chars with 400', async () => {
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/measurements`)
+        .set('Authorization', 'Bearer valid-token')
+        .send({ description: 'A'.repeat(81) });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects extra fields with 400', async () => {
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/measurements`)
+        .set('Authorization', 'Bearer valid-token')
+        .send({ description: 'Gown', extra: 'forbidden' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 404 if project does not exist or is not owned by user', async () => {
+      mockUserClient.from.mockReturnValueOnce({
+        select: vi.fn().mockReturnValueOnce({
+          eq: vi.fn().mockReturnValueOnce({
+            eq: vi.fn().mockReturnValueOnce({
+              maybeSingle: vi.fn().mockResolvedValueOnce({
+                data: null,
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      });
+
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/measurements`)
+        .set('Authorization', 'Bearer valid-token')
+        .send({ description: 'Gown' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('NOT_FOUND');
+    });
+  });
 });
 
