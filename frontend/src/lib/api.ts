@@ -132,7 +132,7 @@ export interface MeasurementItem {
   created_at: string;
 }
 
-export interface ProjectDetail extends ProjectItem {
+export interface ProjectDetail extends Omit<ProjectItem, 'measurements'> {
   measurements: MeasurementItem[];
 }
 
