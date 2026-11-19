@@ -70,3 +70,27 @@ export const getProjectById = async (client, userId, projectId) => {
   return data;
 };
 
+/**
+ * Fetch the user's current active project:
+ * - client_id == userId
+ * - is_archived == false
+ * - status != 'done'
+ * - ordered by updated_at descending, limit 1
+ * - includes measurements(count)
+ */
+export const getCurrentProject = async (client, userId) => {
+  const { data, error } = await client
+    .from('projects')
+    .select('*, measurements(count)')
+    .eq('client_id', userId)
+    .eq('is_archived', false)
+    .neq('status', 'done')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+};
+
+

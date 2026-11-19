@@ -39,3 +39,9 @@ export const getProject = async (accessToken, user, projectId) => {
   return project;
 };
 
+export const getCurrentProject = async (accessToken, user) => {
+  const client = createUserClient(accessToken);
+  const project = await projectsRepository.getCurrentProject(client, user.id);
+  return project || null;
+};
+

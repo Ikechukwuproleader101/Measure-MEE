@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { 
   ArrowLeft, 
   ChevronRight, 
   Plus, 
   Share2, 
-  MessageSquare
+  MessageSquare,
+  AlertCircle
 } from 'lucide-react';
+import { getProject, type ProjectDetail } from '../../lib/api';
 
 interface ProjectDetailsScreenProps {
+  projectId?: string;
   onBack: () => void;
   onSelectGarment: (garmentId: string) => void;
   onAddMeasurement: () => void;
@@ -16,13 +19,56 @@ interface ProjectDetailsScreenProps {
   onShareLink: () => void;
 }
 
+const STEPS: { key: ProjectDetail['status']; label: string; stepNum: number }[] = [
+  { key: 'pending_review', label: 'Review', stepNum: 1 },
+  { key: 'cutting', label: 'Cutting', stepNum: 2 },
+  { key: 'fitting', label: 'Fitting', stepNum: 3 },
+  { key: 'done', label: 'Done', stepNum: 4 },
+];
+
 export const ProjectDetailsScreen: React.FC<ProjectDetailsScreenProps> = ({
+  projectId,
   onBack,
   onSelectGarment,
   onAddMeasurement,
   onOpenComments,
   onShareLink,
 }) => {
+  const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!projectId) {
+      setIsLoading(false);
+      setError('Project not found');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    getProject(projectId)
+      .then((data) => {
+        if (!isCancelled) {
+          setProject(data);
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          setError(err?.message || 'Project not found');
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [projectId]);
+
   const garments = [
     {
       id: 'jacket',
@@ -55,6 +101,46 @@ export const ProjectDetailsScreen: React.FC<ProjectDetailsScreenProps> = ({
       commentsCount: 0
     }
   ];
+
+  if (error || (!isLoading && !project)) {
+    return (
+      <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between max-w-lg mx-auto pb-6">
+        <header className="px-6 pt-6 pb-2 flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-foreground/80 hover:text-foreground hover:bg-muted transition-all cursor-pointer"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        </header>
+
+        <main className="flex-1 px-6 py-12 flex flex-col items-center justify-center text-center">
+          <div className="w-14 h-14 rounded-full bg-muted/60 border border-border flex items-center justify-center text-muted-foreground mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h1 className="font-display font-bold text-xl sm:text-2xl text-foreground">
+            Project not found
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2 max-w-xs">
+            This project could not be found or you do not have permission to view it.
+          </p>
+          <Button onClick={onBack} variant="outline" className="mt-6 rounded-xl cursor-pointer">
+            Back to projects
+          </Button>
+        </main>
+      </div>
+    );
+  }
+
+  const garmentCount = project?.measurements ? project.measurements.length : 0;
+  const subtitleText = garmentCount === 1 ? '1 garment' : `${garmentCount} garments`;
+
+  const currentStepIdx = project
+    ? Math.max(0, STEPS.findIndex((s) => s.key === project.status))
+    : 0;
+  const currentStep = STEPS[currentStepIdx] || STEPS[0];
+  const isCompleted = project?.status === 'done';
 
   return (
     <div className="relative w-full h-full min-h-screen bg-background text-foreground flex flex-col justify-between max-w-lg mx-auto pb-6">
@@ -90,35 +176,67 @@ export const ProjectDetailsScreen: React.FC<ProjectDetailsScreenProps> = ({
       <main className="flex-1 px-6 py-2 flex flex-col gap-5 overflow-y-auto">
         {/* Project Title & Stepper */}
         <div>
-          <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-foreground">
-            Wedding Suit
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Measurements • 3 garments
-          </p>
-
-          {/* Stepper pills */}
-          <div className="mt-4 p-3 bg-card border border-border rounded-2xl text-card-foreground">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-primary">Step 2: Cutting</span>
-              <span className="text-[11px] text-muted-foreground">In progress</span>
+          {isLoading ? (
+            <div>
+              <div className="h-8 w-48 bg-muted animate-pulse rounded-lg" />
+              <div className="h-4 w-24 bg-muted animate-pulse rounded mt-2" />
+              <div className="mt-4 p-4 bg-card border border-border rounded-2xl animate-pulse h-24" />
             </div>
+          ) : (
+            <div>
+              <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-foreground">
+                {project?.name}
+              </h1>
+              <p className="text-xs text-muted-foreground mt-1">
+                {subtitleText}
+              </p>
 
-            {/* Stepper bar */}
-            <div className="flex items-center gap-1.5">
-              <div className="flex-1 h-2 rounded-full bg-primary" />
-              <div className="flex-1 h-2 rounded-full bg-primary/70" />
-              <div className="flex-1 h-2 rounded-full bg-muted" />
-              <div className="flex-1 h-2 rounded-full bg-muted" />
-            </div>
+              {/* Stepper pills */}
+              <div className="mt-4 p-3 bg-card border border-border rounded-2xl text-card-foreground">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-primary">
+                    Step {currentStep.stepNum}: {currentStep.label}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {isCompleted ? 'Completed' : 'In progress'}
+                  </span>
+                </div>
 
-            <div className="flex justify-between text-[10px] text-muted-foreground mt-2 font-medium">
-              <span className="text-foreground">Review</span>
-              <span className="text-primary font-bold">Cutting</span>
-              <span>Fitting</span>
-              <span>Done</span>
+                {/* Stepper bar */}
+                <div className="flex items-center gap-1.5">
+                  {STEPS.map((step, idx) => (
+                    <div
+                      key={step.key}
+                      className={`flex-1 h-2 rounded-full transition-colors ${
+                        idx <= currentStepIdx ? 'bg-primary' : 'bg-muted'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-2 font-medium">
+                  {STEPS.map((step, idx) => {
+                    const isCurrent = idx === currentStepIdx;
+                    const isPast = idx < currentStepIdx;
+                    return (
+                      <span
+                        key={step.key}
+                        className={
+                          isCurrent
+                            ? 'text-primary font-bold'
+                            : isPast
+                            ? 'text-foreground font-medium'
+                            : 'text-muted-foreground'
+                        }
+                      >
+                        {step.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Garments List */}

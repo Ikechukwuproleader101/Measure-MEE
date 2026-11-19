@@ -35,6 +35,17 @@ export type ScreenState =
 
 const PRE_LOGIN_SCREENS: ScreenState[] = ['splash', 'create-account', 'login'];
 
+function getProjectIdFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  const match = window.location.pathname.match(/^\/projects\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1] && match[1] !== 'new') {
+    return match[1];
+  }
+  const params = new URLSearchParams(window.location.search);
+  const qId = params.get('projectId') || params.get('id');
+  return qId || null;
+}
+
 export function App() {
   const { 
     session, 
@@ -46,12 +57,23 @@ export function App() {
     retryLoadProfile, 
     signOut 
   } = useAuth();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => getProjectIdFromLocation());
   const [hasSeenSplash, setHasSeenSplash] = useState<boolean>(() => {
     try {
       return localStorage.getItem('measure_me_has_seen_splash') === 'true';
     } catch {
       return false;
     }
+  });
+  const [intendedScreen, setIntendedScreen] = useState<ScreenState | null>(() => {
+    const initialId = getProjectIdFromLocation();
+    if (initialId) {
+      return 'project-details';
+    }
+    if (typeof window !== 'undefined' && window.location.pathname === '/projects') {
+      return 'projects';
+    }
+    return null;
   });
   const [currentScreen, setCurrentScreen] = useState<ScreenState>(() => {
     try {
@@ -63,8 +85,22 @@ export function App() {
     }
     return 'splash';
   });
-  const [intendedScreen, setIntendedScreen] = useState<ScreenState | null>(null);
   const [showNavDrawer, setShowNavDrawer] = useState(false);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const id = getProjectIdFromLocation();
+      setSelectedProjectId(id);
+      if (id) {
+        setCurrentScreen('project-details');
+      } else if (window.location.pathname === '/projects' || window.location.pathname.startsWith('/projects/')) {
+        setCurrentScreen('projects');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const isAuthed = !!session;
   const hasCompletedOnboarding = !!profile?.onboarding_completed;
@@ -328,8 +364,20 @@ export function App() {
             <DashboardScreen
               userName={displayName}
               onStartMeasurement={() => setCurrentScreen('camera-capture')}
-              onOpenProjects={() => setCurrentScreen('projects')}
-              onOpenProjectDetails={(_id) => setCurrentScreen('project-details')}
+              onOpenProjects={() => {
+                window.history.pushState(null, '', '/projects');
+                setCurrentScreen('projects');
+              }}
+              onOpenProjectDetails={(id) => {
+                if (id) {
+                  setSelectedProjectId(id);
+                  window.history.pushState(null, '', `/projects/${id}`);
+                  setCurrentScreen('project-details');
+                } else {
+                  window.history.pushState(null, '', '/projects');
+                  setCurrentScreen('projects');
+                }
+              }}
               onShareLink={() => setCurrentScreen('share-link')}
               onSignOut={handleSignOut}
             />
@@ -337,15 +385,27 @@ export function App() {
 
           {activeScreen === 'projects' && (
             <ProjectsScreen
-              onBackToHome={() => setCurrentScreen('dashboard')}
-              onOpenProject={(_id) => setCurrentScreen('project-details')}
+              onBackToHome={() => {
+                window.history.pushState(null, '', '/');
+                setCurrentScreen('dashboard');
+              }}
+              onOpenProject={(id) => {
+                setSelectedProjectId(id);
+                window.history.pushState(null, '', `/projects/${id}`);
+                setCurrentScreen('project-details');
+              }}
               onShareLink={() => setCurrentScreen('share-link')}
             />
           )}
 
           {activeScreen === 'project-details' && (
             <ProjectDetailsScreen
-              onBack={() => setCurrentScreen('projects')}
+              projectId={selectedProjectId || getProjectIdFromLocation() || undefined}
+              onBack={() => {
+                setSelectedProjectId(null);
+                window.history.pushState(null, '', '/projects');
+                setCurrentScreen('projects');
+              }}
               onSelectGarment={(_id) => setCurrentScreen('garment-canvas')}
               onAddMeasurement={() => setCurrentScreen('camera-capture')}
               onOpenComments={() => setCurrentScreen('comments')}

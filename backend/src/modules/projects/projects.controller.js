@@ -40,3 +40,11 @@ export const getProject = asyncHandler(async (req, res) => {
   res.status(200).json(project);
 });
 
+export const getCurrentProject = asyncHandler(async (req, res) => {
+  const project = await projectsService.getCurrentProject(
+    req.accessToken,
+    req.user
+  );
+  res.status(200).json(project);
+});
+

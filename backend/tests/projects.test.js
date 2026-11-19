@@ -311,6 +311,84 @@ describe('Projects Module Endpoints (/api/projects)', () => {
     });
   });
 
+  describe('GET /api/projects/current', () => {
+    it('returns the user most recently updated active project with measurements count', async () => {
+      const currentProject = {
+        id: '2d8bb5d1-eaee-4f93-b68a-f74f7fc66d48',
+        client_id: regularUser.id,
+        name: "Ada's Lace",
+        status: 'pending_review',
+        progress: 25,
+        is_archived: false,
+        updated_at: '2026-11-19T12:00:00Z',
+        measurements: [{ count: 0 }],
+      };
+
+      const limitMock = vi.fn().mockReturnValueOnce({
+        maybeSingle: vi.fn().mockResolvedValueOnce({
+          data: currentProject,
+          error: null,
+        }),
+      });
+
+      mockUserClient.from.mockReturnValueOnce({
+        select: vi.fn().mockReturnValueOnce({
+          eq: vi.fn().mockReturnValueOnce({
+            eq: vi.fn().mockReturnValueOnce({
+              neq: vi.fn().mockReturnValueOnce({
+                order: vi.fn().mockReturnValueOnce({
+                  limit: limitMock,
+                }),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      const res = await request(app)
+        .get('/api/projects/current')
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(currentProject);
+      expect(limitMock).toHaveBeenCalledWith(1);
+    });
+
+    it('returns null with status 200 when user has no matching active projects', async () => {
+      mockUserClient.from.mockReturnValueOnce({
+        select: vi.fn().mockReturnValueOnce({
+          eq: vi.fn().mockReturnValueOnce({
+            eq: vi.fn().mockReturnValueOnce({
+              neq: vi.fn().mockReturnValueOnce({
+                order: vi.fn().mockReturnValueOnce({
+                  limit: vi.fn().mockReturnValueOnce({
+                    maybeSingle: vi.fn().mockResolvedValueOnce({
+                      data: null,
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      const res = await request(app)
+        .get('/api/projects/current')
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toBeNull();
+    });
+
+    it('returns 401 when no token is provided', async () => {
+      const res = await request(app).get('/api/projects/current');
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('UNAUTHORIZED');
+    });
+  });
+
   describe('GET /api/projects/:id', () => {
     const projectId = '2d8bb5d1-eaee-4f93-b68a-f74f7fc66d48';
 

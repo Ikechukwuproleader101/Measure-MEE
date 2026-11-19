@@ -27,6 +27,11 @@ router.post(
 );
 
 router.get(
+  '/current',
+  projectsController.getCurrentProject
+);
+
+router.get(
   '/:id',
   validate({ params: projectParamsSchema }),
   projectsController.getProject
